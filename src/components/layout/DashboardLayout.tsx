@@ -22,7 +22,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <AppSidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
       <div className="flex flex-1 flex-col lg:ml-[260px]">
         <AppHeader title={title} onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto page-fade-in">{children}</main>
       </div>
     </div>
   );

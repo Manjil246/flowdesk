@@ -9,6 +9,7 @@ import LeadsPage from "@/pages/LeadsPage";
 import CampaignsPage from "@/pages/CampaignsPage";
 import BotSettingsPage from "@/pages/BotSettingsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import LoginPage from "@/pages/LoginPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -16,9 +17,10 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Sonner />
+      <Sonner position="top-right" richColors closeButton visibleToasts={3} />
       <BrowserRouter>
         <Routes>
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<DashboardLayout><DashboardPage /></DashboardLayout>} />
           <Route path="/conversations" element={<DashboardLayout><ConversationsPage /></DashboardLayout>} />
           <Route path="/leads" element={<DashboardLayout><LeadsPage /></DashboardLayout>} />
