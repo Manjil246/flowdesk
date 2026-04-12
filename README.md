@@ -1,11 +1,10 @@
 # FlowDesk
 
-Monorepo: **React + Vite** frontend (`client/`) and **Go** API (`server/`).
+Monorepo: **React + Vite** frontend (`client/`) and **Express + TypeScript** API (`server/`), based on [node-backend-template-ts](https://github.com/Manjil246/node-backend-template-ts).
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) (or use npm/pnpm if you prefer)
-- [Go](https://go.dev/dl/) 1.22+
+- [Bun](https://bun.sh)
 
 ## Client
 
@@ -16,30 +15,38 @@ bun install
 bun run dev
 ```
 
-The app runs at **http://localhost:5173** (see `client/vite.config.ts`).
+The app runs at **http://localhost:5173**.
 
-Use **`VITE_API_BASE_URL`** in `.env` for the Go API base URL (default in `.env.example`: `http://localhost:8000`). Read it in code as `import.meta.env.VITE_API_BASE_URL`.
+Use **`VITE_API_BASE_URL`** in `.env` (default: `http://localhost:8000`) so the UI can call the API.
 
 ## Server
 
 ```bash
 cd server
-go run .
+cp .env.example .env
+bun install
+bun run dev
 ```
 
-The API listens on **http://localhost:8000** by default. Override with the **`PORT`** environment variable if needed.
+Runs on **http://localhost:8000** by default (`PORT` in `.env`). **Bun** executes TypeScript directly; `--watch` restarts on file changes.
 
-- Health check: **GET** `http://localhost:8000/health`
+Copy **`server/.env.example`** → **`.env`** and fill in values (MongoDB Atlas URI, Meta **`VERIFY_TOKEN`** / **`WHATSAPP_TOKEN`** / **`PHONE_NUMBER_ID`** / **`WABA_ID`**, **`OPENAI_API_KEY`** when you use the bot). See comments in `.env.example`.
+
+- Meta webhook verify: **GET** `https://<tunnel>/webhook?hub.mode=subscribe&hub.verify_token=…&hub.challenge=…`
+- Meta webhook events: **POST** `https://<tunnel>/webhook` — responds with `200` + `EVENT_RECEIVED` immediately, then logs payload to the server console
+- Health: **GET** `http://localhost:8000/api/v1/health-check` (see template routes)
+
+**Production:** `bun run build` then `bun run start` (serves compiled `dist/`).
 
 ## Run both
 
-1. Terminal A: start the server (`cd server && go run .`).
-2. Terminal B: start the client (`cd client && bun run dev`).
+1. Terminal A: `cd server && bun run dev`
+2. Terminal B: `cd client && bun run dev`
 
-Point the client at the API via `client/.env` (`VITE_API_BASE_URL`).
+Align CORS origins via `server/.env` (`FRONTEND_BASE_URL`, `BACKEND_BASE_URL`).
 
 ## Build
 
-**Client:** `cd client && bun run build` (output: `client/dist`).
+**Client:** `cd client && bun run build` → `client/dist`.
 
-**Server:** `cd server && go build -o flowdesk-server .` (Windows: `flowdesk-server.exe`).
+**Server:** `cd server && bun run build` → `dist/`.

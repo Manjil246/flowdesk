@@ -1,0 +1,31 @@
+{
+  "name": "flowdesk-server",
+  "author": {
+    "name": "Manjil Dhungana",
+    "email": "manjildhungana8@gmail.com"
+  },
+  "module": "src/server.ts",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch src/server.ts",
+    "start": "bun run dist/server.js",
+    "build": "tsc",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "mongoose": "^8.19.0",
+    "zod": "^4.1.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "typescript": "^5.9.2"
+  }
+}
