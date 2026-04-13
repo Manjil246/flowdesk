@@ -79,71 +79,6 @@ function usesRestrictedChatCompletionParams(model: string): boolean {
 }
 
 export class OpenAIService implements IOpenAIService {
-  async createChatCompletion(messages: OpenAIChatMessage[]): Promise<string> {
-    const key = OPENAI_API_KEY.trim();
-    if (!key) {
-      throw new Error("OPENAI_API_KEY is not configured");
-    }
-    if (!messages.length) {
-      throw new Error("OpenAI chat completion requires at least one message");
-    }
-
-    const restricted = usesRestrictedChatCompletionParams(OPENAI_MODEL);
-    const payload: Record<string, unknown> = {
-      model: OPENAI_MODEL,
-      messages,
-      ...(restricted
-        ? {
-            // Reasoning models burn this budget on internal + visible tokens; a
-            // few hundred is not enough and `content` can be empty.
-            max_completion_tokens: OPENAI_MAX_COMPLETION_TOKENS,
-            ...(OPENAI_MODEL.toLowerCase().includes("gpt-5")
-              ? { reasoning_effort: "minimal" }
-              : {}),
-          }
-        : {
-            max_tokens: OPENAI_MAX_TOKENS,
-            temperature: OPENAI_TEMPERATURE,
-          }),
-    };
-
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const json = (await res.json()) as ChatCompletionsResponse;
-
-    if (!res.ok) {
-      const msg =
-        json.error?.message ?? `OpenAI request failed with HTTP ${res.status}`;
-      throw new Error(msg);
-    }
-
-    const choice = json.choices?.[0];
-    const message = choice?.message;
-    if (!message) {
-      throw new Error("OpenAI returned no assistant message object");
-    }
-    const { text, refusal } = assistantVisibleText(message);
-    if (refusal) {
-      throw new Error(`OpenAI refusal: ${refusal}`);
-    }
-    if (!text) {
-      const fr = choice?.finish_reason ?? "unknown";
-      const rt = json.usage?.completion_tokens_details?.reasoning_tokens ?? "?";
-      const ct = json.usage?.completion_tokens ?? "?";
-      throw new Error(
-        `OpenAI returned an empty assistant message (finish_reason=${fr}; completion_tokens=${ct}; reasoning_tokens=${rt}). For GPT-5, increase OPENAI_MAX_COMPLETION_TOKENS — reasoning uses the same cap as visible text.`,
-      );
-    }
-    return text;
-  }
-
   async runChatWithTools(
     messages: OpenAIChatMessage[],
     options: {
@@ -176,6 +111,8 @@ export class OpenAIService implements IOpenAIService {
           }),
       tools: options.tools,
       tool_choice: "auto",
+      /** Avoid duplicate `send_whatsapp_text` (and ordering surprises) in one assistant turn. */
+      parallel_tool_calls: false,
     };
 
     const working: unknown[] = messages.map((m) => ({

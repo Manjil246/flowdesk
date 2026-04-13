@@ -51,6 +51,8 @@ export class BotReplyService implements IBotReplyService {
       ];
 
       const conversationId = input.conversationId;
+      /** Prevents duplicate customer bubbles when the model echoes the same line in `content` after `send_whatsapp_text`. */
+      let sentWhatsAppTextThisRun = false;
 
       await this.openAIService.runChatWithTools(messages, {
         tools: LADIES_FASHION_WHATSAPP_TOOLS,
@@ -110,6 +112,7 @@ export class BotReplyService implements IBotReplyService {
                 text,
                 senderRole: "bot",
               });
+              sentWhatsAppTextThisRun = true;
               return JSON.stringify({ ok: true });
             } catch (e: unknown) {
               const m = e instanceof Error ? e.message : String(e);
@@ -120,6 +123,7 @@ export class BotReplyService implements IBotReplyService {
           return JSON.stringify({ ok: false, error: `unknown_tool:${name}` });
         },
         onContentFallback: async (text) => {
+          if (sentWhatsAppTextThisRun) return;
           await this.whatsAppService.sendTextMessage({
             conversationId,
             text,

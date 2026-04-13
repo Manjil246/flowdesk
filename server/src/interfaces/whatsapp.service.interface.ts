@@ -8,7 +8,7 @@ export type SendWhatsAppTextInput = {
 export type SendWhatsAppImageByLinkInput = {
   conversationId: string;
   imageUrl: string;
-  /** Short sku ref stored in Mongo, e.g. KURTA-01 */
+  /** Short sku ref stored in Mongo, e.g. SS-K01 */
   mediaRef: string;
   senderRole: "admin" | "bot";
 };

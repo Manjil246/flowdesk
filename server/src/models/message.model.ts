@@ -36,7 +36,7 @@ const messageSchema = new Schema(
     isInbound: { type: Boolean, required: true },
     replyToMessageId: { type: String, default: null },
     mediaId: { type: String, default: null },
-    /** Short handle e.g. sku `KURTA-01` for outbound product photos (no binary in DB). */
+    /** Short handle e.g. sku `SS-K01` for outbound product photos (no binary in DB). */
     mediaRef: { type: String, default: null },
     mediaUrl: { type: String, default: null },
     mediaCaption: { type: String, default: null },
