@@ -2,7 +2,7 @@
 
 Filenames are defined in `src/constants/product-image-map.ts` (sku → file name).
 
-Add JPEG/PNG files under this folder to match those names (e.g. `KURTA-01.jpg`).
+Add JPEG/PNG files under this folder to match those names (e.g. `SS-K01.jpg`).
 
 ## WhatsApp
 

@@ -11,13 +11,6 @@ export type OpenAIToolCallHandler = (
 
 export interface IOpenAIService {
   /**
-   * Runs a chat completion. The caller supplies the full \`messages\` array
-   * (system prompt + history); this method only talks to OpenAI and returns
-   * the assistant’s text content.
-   */
-  createChatCompletion(messages: OpenAIChatMessage[]): Promise<string>;
-
-  /**
    * Runs chat completions with tools until the model stops requesting tools.
    * Executes each tool call via \`onToolCall\` (return a short JSON string for the tool role).
    * If the model returns plain assistant \`content\` without tool_calls, \`onContentFallback\` runs when provided.

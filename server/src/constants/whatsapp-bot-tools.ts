@@ -16,7 +16,7 @@ export const LADIES_FASHION_WHATSAPP_TOOLS = [
           sku: {
             type: "string",
             enum: skuEnum,
-            description: "Catalogue sku exactly as listed (e.g. KURTA-01).",
+            description: "Catalogue sku exactly as listed (e.g. SS-K01).",
           },
         },
         required: ["sku"],
@@ -28,13 +28,14 @@ export const LADIES_FASHION_WHATSAPP_TOOLS = [
     function: {
       name: "send_whatsapp_text",
       description:
-        "Send your full reply to the customer on WhatsApp. Every customer-visible message must go through this tool (Nepali/English per system rules). Keep text short per system limits.",
+        "Send your full reply to the customer on WhatsApp. Every customer-visible message must go through this tool (Nepali/English per system rules). WhatsApp: bold uses single asterisks around Latin text only (*StyleSutra*) — never **. For Nepali menus use plain numbered lines (1. कुर्ता) with no asterisks around Devanagari. For menus ask the user to reply with a number only; do not dump the full catalogue in one message. No Markdown # or [text](url). Keep replies short.",
       parameters: {
         type: "object",
         properties: {
           text: {
             type: "string",
-            description: "Complete message body for the customer.",
+            description:
+              "Complete message body for the customer. WhatsApp formatting: *bold* not **bold**; no Markdown headings or link syntax.",
           },
         },
         required: ["text"],

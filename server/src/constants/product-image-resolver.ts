@@ -1,6 +1,5 @@
 import fs from "fs";
 import path from "path";
-import { LADIES_FASHION_CATALOG_SKUS } from "./catalog-skus";
 import {
   isMappedProductImageSku,
   PRODUCT_IMAGE_FILE_BY_SKU,
@@ -11,16 +10,6 @@ const PRODUCTS_REL = path.join("public", "products");
 /** Files live under `server/public/products/` (see `PRODUCT_IMAGE_FILE_BY_SKU`). */
 export function productImagesDir(): string {
   return path.join(process.cwd(), PRODUCTS_REL);
-}
-
-/** First catalog sku found in `text` that has an image map entry (case-insensitive). */
-export function detectCatalogSkuInText(text: string): string | null {
-  const upper = text.toUpperCase();
-  for (const sku of LADIES_FASHION_CATALOG_SKUS) {
-    if (!upper.includes(sku)) continue;
-    if (isMappedProductImageSku(sku)) return sku;
-  }
-  return null;
 }
 
 /** Mapped filename if the file exists on disk, else null. */
