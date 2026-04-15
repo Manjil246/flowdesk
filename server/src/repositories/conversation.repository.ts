@@ -26,6 +26,16 @@ export class ConversationRepository implements IConversationRepository {
     return Boolean(doc);
   }
 
+  async findPhoneByConversationId(
+    conversationId: string,
+  ): Promise<string | null> {
+    const doc = (await Conversation.findById(conversationId)
+      .select("phone")
+      .lean()) as { phone?: string } | null;
+    const p = doc?.phone;
+    return typeof p === "string" && p.trim() ? p.trim() : null;
+  }
+
   async upsertInboundByPhone(
     phone: string,
     setOnInsert: Record<string, unknown>,

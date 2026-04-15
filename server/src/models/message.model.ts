@@ -5,7 +5,16 @@ const interactiveReplySchema = new Schema(
     buttonId: { type: String, default: null },
     buttonTitle: { type: String, default: null },
   },
-  { _id: false }
+  { _id: false },
+);
+
+const toolTraceStepSchema = new Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    arguments: { type: String, default: "" },
+    result: { type: String, default: "" },
+  },
+  { _id: false },
 );
 
 const messageSchema = new Schema(
@@ -44,8 +53,10 @@ const messageSchema = new Schema(
     templateName: { type: String, default: null },
     errorMessage: { type: String, default: null },
     metaTimestamp: { type: String, default: null },
+    /** Bot/admin outbound: tool name, raw arguments JSON, and tool result JSON per round (replay for GPT). */
+    toolTrace: { type: [toolTraceStepSchema], default: undefined },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 messageSchema.index({ messageId: 1 }, { unique: true });

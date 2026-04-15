@@ -145,7 +145,7 @@ export default function AppHeader({ title, onMenuClick }: AppHeaderProps) {
 
       {/* Logout Confirmation Modal */}
       {showLogoutConfirm && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4" onClick={() => setShowLogoutConfirm(false)}>
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4" onClick={() => setShowLogoutConfirm(false)}>
           <div className="w-full max-w-sm rounded-lg bg-card p-6 card-shadow modal-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground">Confirm Logout</h3>

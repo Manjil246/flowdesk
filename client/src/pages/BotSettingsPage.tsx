@@ -273,7 +273,7 @@ export default function BotSettingsPage() {
 
       {/* Delete Step Confirm */}
       {showDeleteStep !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4" onClick={() => setShowDeleteStep(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4" onClick={() => setShowDeleteStep(null)}>
           <div className="w-full max-w-sm rounded-lg bg-card p-6 card-shadow modal-scale-in" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-foreground mb-2">Delete Step</h3>
             <p className="text-sm text-muted-foreground mb-6">Are you sure you want to remove this step?</p>
@@ -287,7 +287,7 @@ export default function BotSettingsPage() {
 
       {/* Test Chat Modal */}
       {showTestChat && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4" onClick={() => setShowTestChat(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4" onClick={() => setShowTestChat(false)}>
           <div className="w-full max-w-md rounded-lg bg-card card-shadow modal-scale-in flex flex-col h-[500px]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="flex items-center gap-2">

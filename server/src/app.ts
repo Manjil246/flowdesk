@@ -1,10 +1,13 @@
 import express, { Application } from "express";
-import path from "path";
 import cors, { CorsOptions } from "cors";
 import cookieParser from "cookie-parser";
 import { HealthCheckRoutes } from "./routes/healthCheck.route";
 import { WebhookRoutes } from "./routes/webhook.route";
 import { ConversationRoutes } from "./routes/conversation.route";
+import { CategoryRoutes } from "./routes/category.route";
+import { ProductRoutes } from "./routes/product.route";
+import { UploadRoutes } from "./routes/upload.route";
+import { OrderRoutes } from "./routes/order.route";
 import { BACKEND_BASE_URL, FRONTEND_BASE_URL, LOCAL_DEVELOPMENT_URL } from "./config/imports";
 
 export class App {
@@ -28,21 +31,24 @@ export class App {
       (corsOptions.origin as string[]).push(LOCAL_DEVELOPMENT_URL);
     }
     this.app.use(cors(corsOptions));
-    /** Public product photos for WhatsApp `image.link` (files under `server/public/products/`). */
-    this.app.use(
-      "/products",
-      express.static(path.join(process.cwd(), "public", "products")),
-    );
   }
 
   private initializeRoutes(): void {
     const healthCheckRoutes = new HealthCheckRoutes();
     const webhookRoutes = new WebhookRoutes();
     const conversationRoutes = new ConversationRoutes();
+    const categoryRoutes = new CategoryRoutes();
+    const productRoutes = new ProductRoutes();
+    const uploadRoutes = new UploadRoutes();
+    const orderRoutes = new OrderRoutes();
 
     this.app.use("/webhook", webhookRoutes.getRouter());
     this.app.use("/api/v1/health-check", healthCheckRoutes.getRouter());
     this.app.use("/api/v1/conversations", conversationRoutes.getRouter());
+    this.app.use("/api/v1/categories", categoryRoutes.getRouter());
+    this.app.use("/api/v1/products", productRoutes.getRouter());
+    this.app.use("/api/v1/uploads", uploadRoutes.getRouter());
+    this.app.use("/api/v1/orders", orderRoutes.getRouter());
   }
 
   public getApp(): Application {

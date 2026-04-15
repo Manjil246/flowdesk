@@ -22,6 +22,14 @@ export class BadRequestError extends Error {
   }
 }
 
+/** Public image URL failed HEAD/GET probe before WhatsApp send (bad link, timeout, non-image). */
+export class ImageUrlUnreachableError extends BadRequestError {
+  constructor(message: string) {
+    super(message);
+    this.name = "ImageUrlUnreachableError";
+  }
+}
+
 /** Missing or invalid WhatsApp env configuration (HTTP 503). */
 export class WhatsAppConfigError extends Error {
   constructor(message: string) {

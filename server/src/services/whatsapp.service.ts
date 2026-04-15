@@ -20,6 +20,8 @@ import {
 } from "../errors/service.errors";
 import { isMongoReady } from "../lib/db-ready";
 import { normalizeWaPhone, toWhatsAppCloudRecipientId } from "../utils/phone";
+import { assertPublicImageUrlFetchable } from "../utils/verify-image-url";
+import { sanitizeWhatsAppText } from "../utils/sanitize-whatsapp-text";
 
 type GraphSendTextResponse = {
   messages?: Array<{ id?: string }>;
@@ -28,6 +30,44 @@ type GraphSendTextResponse = {
 
 export class WhatsAppService implements IWhatsAppService {
   constructor(private readonly whatsAppRepository: IWhatsAppRepository) {}
+
+  private async sendGraphImageWithRetry(
+    url: string,
+    token: string,
+    to: string,
+    imageUrl: string,
+  ): Promise<{ res: Response; json: GraphSendTextResponse }> {
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to,
+            type: "image",
+            image: { link: imageUrl },
+          }),
+        });
+        const json = (await res.json()) as GraphSendTextResponse;
+        if (res.ok) return { res, json };
+        const msg = json.error?.message ?? `Graph API error (${res.status})`;
+        lastErr = new WhatsAppApiError(msg, res.status, json);
+      } catch (e: unknown) {
+        lastErr = e;
+      }
+      if (attempt < 1) {
+        await new Promise((r) => setTimeout(r, 450));
+      }
+    }
+    if (lastErr instanceof Error) throw lastErr;
+    throw new Error("Graph image send failed");
+  }
 
   async sendTextMessage(
     input: SendWhatsAppTextInput,
@@ -67,6 +107,11 @@ export class WhatsAppService implements IWhatsAppService {
       throw new BadRequestError("Invalid customer phone on conversation");
     }
 
+    const safeText = sanitizeWhatsAppText(input.text);
+    if (!safeText) {
+      throw new BadRequestError("Cannot send empty text message");
+    }
+
     const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`;
     const res = await fetch(url, {
       method: "POST",
@@ -79,7 +124,7 @@ export class WhatsAppService implements IWhatsAppService {
         recipient_type: "individual",
         to,
         type: "text",
-        text: { preview_url: false, body: input.text },
+        text: { preview_url: false, body: safeText },
       }),
     });
 
@@ -110,16 +155,17 @@ export class WhatsAppService implements IWhatsAppService {
         from: input.senderRole,
         fromPhone: fromPhoneE164,
         toPhone: customerE164,
-        text: input.text,
+        text: safeText,
         timestamp: now,
         status: "pending",
         type: "text",
         isInbound: false,
+        toolTrace: input.toolTrace?.length ? input.toolTrace : undefined,
       });
 
     await this.whatsAppRepository.updateConversationAfterOutbound(
       input.conversationId,
-      input.text,
+      safeText,
       now,
     );
 
@@ -164,23 +210,22 @@ export class WhatsAppService implements IWhatsAppService {
       throw new BadRequestError("Invalid customer phone on conversation");
     }
 
-    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to,
-        type: "image",
-        image: { link: input.imageUrl },
-      }),
-    });
+    try {
+      await assertPublicImageUrlFetchable(input.imageUrl);
+    } catch (e: unknown) {
+      const m = e instanceof Error ? e.message : String(e);
+      console.warn(
+        `[whatsapp][image] preflight failed, trying Meta anyway: ${m}`,
+      );
+    }
 
-    const json = (await res.json()) as GraphSendTextResponse;
+    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`;
+    const { res, json } = await this.sendGraphImageWithRetry(
+      url,
+      token,
+      to,
+      input.imageUrl,
+    );
 
     if (!res.ok) {
       const msg = json.error?.message ?? `Graph API error (${res.status})`;
@@ -198,7 +243,7 @@ export class WhatsAppService implements IWhatsAppService {
 
     const now = new Date();
     const fromPhoneE164 = normalizeWaPhone(businessPhone);
-    const previewText = `[Photo:${input.mediaRef}]`;
+    const lastPreview = `Photo · ${input.mediaRef}`.slice(0, 500);
 
     const { mongoMessageId } =
       await this.whatsAppRepository.insertOutboundMessage({
@@ -208,7 +253,7 @@ export class WhatsAppService implements IWhatsAppService {
         from: input.senderRole,
         fromPhone: fromPhoneE164,
         toPhone: customerE164,
-        text: previewText,
+        text: "",
         timestamp: now,
         status: "pending",
         type: "image",
@@ -216,11 +261,12 @@ export class WhatsAppService implements IWhatsAppService {
         mediaRef: input.mediaRef,
         mediaUrl: input.imageUrl,
         mediaCaption: null,
+        toolTrace: input.toolTrace?.length ? input.toolTrace : undefined,
       });
 
     await this.whatsAppRepository.updateConversationAfterOutbound(
       input.conversationId,
-      previewText,
+      lastPreview,
       now,
     );
 

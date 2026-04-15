@@ -237,7 +237,7 @@ export default function LeadsPage() {
 
       {/* Add/Edit Lead Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4" onClick={() => { setShowAddModal(false); setEditLead(null); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4" onClick={() => { setShowAddModal(false); setEditLead(null); }}>
           <div className="w-full max-w-lg rounded-lg bg-card p-6 card-shadow modal-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground">{editLead ? "Edit Lead" : "Add New Lead"}</h3>
@@ -285,7 +285,7 @@ export default function LeadsPage() {
 
       {/* View Lead Modal */}
       {viewLead && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4" onClick={() => setViewLead(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4" onClick={() => setViewLead(null)}>
           <div className="w-full max-w-lg rounded-lg bg-card p-6 card-shadow modal-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground">Lead Details</h3>
@@ -325,7 +325,7 @@ export default function LeadsPage() {
 
       {/* Delete Confirm */}
       {showDeleteConfirm !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4" onClick={() => setShowDeleteConfirm(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4" onClick={() => setShowDeleteConfirm(null)}>
           <div className="w-full max-w-sm rounded-lg bg-card p-6 card-shadow modal-scale-in" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-foreground mb-2">Delete Lead</h3>
             <p className="text-sm text-muted-foreground mb-6">Are you sure you want to delete this lead?</p>
@@ -339,7 +339,7 @@ export default function LeadsPage() {
 
       {/* Bulk Delete Confirm */}
       {showBulkDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4" onClick={() => setShowBulkDeleteConfirm(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4" onClick={() => setShowBulkDeleteConfirm(false)}>
           <div className="w-full max-w-sm rounded-lg bg-card p-6 card-shadow modal-scale-in" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-foreground mb-2">Delete {selectedIds.length} Leads</h3>
             <p className="text-sm text-muted-foreground mb-6">Are you sure you want to delete the selected leads?</p>

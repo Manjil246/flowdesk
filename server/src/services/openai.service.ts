@@ -111,7 +111,7 @@ export class OpenAIService implements IOpenAIService {
           }),
       tools: options.tools,
       tool_choice: "auto",
-      /** Avoid duplicate `send_whatsapp_text` (and ordering surprises) in one assistant turn. */
+      /** Catalog + image tools only; keep sequential for predictable ordering. */
       parallel_tool_calls: false,
     };
 
