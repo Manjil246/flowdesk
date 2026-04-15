@@ -6,6 +6,7 @@
 
 import mongoose from "mongoose";
 import { MONGODB_URI } from "./imports";
+import { syncCatalogModelIndexes } from "../lib/sync-catalog-indexes";
 
 export class MongoDB {
   private static instance: MongoDB;
@@ -27,6 +28,16 @@ export class MongoDB {
     try {
       await mongoose.connect(MONGODB_URI);
       console.log("✅ Connected to MongoDB");
+
+      try {
+        await syncCatalogModelIndexes();
+        console.log("✅ Catalog indexes synced with schemas");
+      } catch (e) {
+        console.warn(
+          "⚠️ Catalog index sync failed — you may need to drop legacy slug indexes manually:",
+          e,
+        );
+      }
 
       mongoose.connection.on("error", (error: unknown) => {
         console.error("❌ MongoDB connection error:", error);

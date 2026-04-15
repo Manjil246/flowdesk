@@ -1,16 +1,20 @@
+import type { OutboundToolTraceEntry } from "./whatsapp.repository.interface";
+
 export type SendWhatsAppTextInput = {
   conversationId: string;
   text: string;
   senderRole: "admin" | "bot";
+  toolTrace?: OutboundToolTraceEntry[];
 };
 
 /** Outbound image via public HTTPS `link` (Cloud API). */
 export type SendWhatsAppImageByLinkInput = {
   conversationId: string;
   imageUrl: string;
-  /** Short sku ref stored in Mongo, e.g. SS-K01 */
+  /** Short ref stored in Mongo, e.g. productId:colorId */
   mediaRef: string;
   senderRole: "admin" | "bot";
+  toolTrace?: OutboundToolTraceEntry[];
 };
 
 export type SendWhatsAppTextResult = {

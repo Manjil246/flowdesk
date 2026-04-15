@@ -518,10 +518,12 @@ export default function ConversationsPage() {
                             className="mb-2 max-h-52 w-full max-w-[min(100%,260px)] rounded object-cover"
                           />
                         ) : null}
-                        {!(
+                        {msg.text?.trim() &&
+                        !(
                           msg.type === "image" &&
                           msg.mediaUrl &&
-                          /^\[Photo:/.test(msg.text)
+                          (msg.text === msg.mediaUrl ||
+                            /^\[Photo:/.test(msg.text))
                         ) ? (
                           <p className="whitespace-pre-line break-words text-sm">
                             {msg.text}

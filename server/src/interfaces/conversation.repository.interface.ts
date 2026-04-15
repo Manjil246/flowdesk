@@ -30,6 +30,9 @@ export interface IConversationRepository {
 
   existsById(id: string): Promise<boolean>;
 
+  /** Customer WhatsApp E.164 for a conversation, if it exists. */
+  findPhoneByConversationId(conversationId: string): Promise<string | null>;
+
   upsertInboundByPhone(
     phone: string,
     setOnInsert: Record<string, unknown>,

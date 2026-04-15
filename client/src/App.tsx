@@ -11,6 +11,12 @@ import BotSettingsPage from "@/pages/BotSettingsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import LoginPage from "@/pages/LoginPage";
 import NotFound from "@/pages/NotFound";
+import CategoriesPage from "@/pages/CategoriesPage";
+import ProductsPage from "@/pages/ProductsPage";
+import ProductNewPage from "@/pages/ProductNewPage";
+import ProductEditPage from "@/pages/ProductEditPage";
+import OrdersPage from "@/pages/OrdersPage";
+import OrderDetailPage from "@/pages/OrderDetailPage";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +33,12 @@ const App = () => (
           <Route path="/campaigns" element={<DashboardLayout><CampaignsPage /></DashboardLayout>} />
           <Route path="/bot-settings" element={<DashboardLayout><BotSettingsPage /></DashboardLayout>} />
           <Route path="/settings" element={<DashboardLayout><SettingsPage /></DashboardLayout>} />
+          <Route path="/categories" element={<DashboardLayout><CategoriesPage /></DashboardLayout>} />
+          <Route path="/products" element={<DashboardLayout><ProductsPage /></DashboardLayout>} />
+          <Route path="/products/new" element={<DashboardLayout><ProductNewPage /></DashboardLayout>} />
+          <Route path="/products/:productId" element={<DashboardLayout><ProductEditPage /></DashboardLayout>} />
+          <Route path="/orders" element={<DashboardLayout><OrdersPage /></DashboardLayout>} />
+          <Route path="/orders/:orderId" element={<DashboardLayout><OrderDetailPage /></DashboardLayout>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

@@ -19,7 +19,7 @@ const conversationSchema = new Schema(
     campaignId: { type: Schema.Types.ObjectId, default: null },
     tags: { type: [String], default: [] },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 conversationSchema.index({ phone: 1 }, { unique: true });

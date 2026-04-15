@@ -52,6 +52,7 @@ export class WhatsAppRepository implements IWhatsAppRepository {
       templateName: null,
       errorMessage: null,
       metaTimestamp: null,
+      toolTrace: doc.toolTrace?.length ? doc.toolTrace : undefined,
     });
     return { mongoMessageId: String(created._id) };
   }

@@ -10,6 +10,9 @@ const pageTitles: Record<string, string> = {
   "/campaigns": "Campaigns",
   "/bot-settings": "Bot Configuration",
   "/settings": "Settings",
+  "/categories": "Categories",
+  "/products": "Products",
+  "/orders": "Orders",
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

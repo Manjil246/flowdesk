@@ -8,6 +8,13 @@ export type ConversationSendContext = {
   isArchived: boolean;
 };
 
+/** One tool round persisted on an outbound message (for replay / debugging). */
+export type OutboundToolTraceEntry = {
+  name: string;
+  arguments: string;
+  result: string;
+};
+
 /** Fields required to insert an outbound row in `Message` after Graph API success. */
 export type OutboundMessageInsertInput = {
   conversationId: Types.ObjectId;
@@ -24,6 +31,8 @@ export type OutboundMessageInsertInput = {
   mediaRef?: string | null;
   mediaUrl?: string | null;
   mediaCaption?: string | null;
+  /** Tools invoked in this assistant turn up to and including this outbound (bot only). */
+  toolTrace?: OutboundToolTraceEntry[];
 };
 
 export interface IWhatsAppRepository {

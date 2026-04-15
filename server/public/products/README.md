@@ -1,9 +1,5 @@
 # Product images
 
-Filenames are defined in `src/constants/product-image-map.ts` (sku → file name).
+Product photos are stored as **HTTPS URLs** on each catalog color (`imageUrl`), typically **Cloudinary**. The WhatsApp bot sends those links directly to Meta; this folder is not used for hosted catalog JPEGs anymore.
 
-Add JPEG/PNG files under this folder to match those names (e.g. `SS-K01.jpg`).
-
-## WhatsApp
-
-Meta loads `image.link` from your **`BACKEND_BASE_URL`** + `/products/{file}`. Use a **public HTTPS** origin (e.g. deployed API or ngrok) so image sends work.
+The directory is kept (with `.gitkeep`) only so `public/products` remains in the tree if you want local assets later.

@@ -157,7 +157,7 @@ export default function CampaignsPage() {
 
       {/* Create Campaign Modal */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4" onClick={resetCreate}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4" onClick={resetCreate}>
           <div className="w-full max-w-lg rounded-lg bg-card p-6 card-shadow modal-scale-in max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-foreground">Create Campaign</h3>
@@ -274,7 +274,7 @@ export default function CampaignsPage() {
 
       {/* Campaign Detail Modal */}
       {showDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4" onClick={() => setShowDetail(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4" onClick={() => setShowDetail(null)}>
           <div className="w-full max-w-md rounded-lg bg-card p-6 card-shadow modal-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground">{showDetail.name}</h3>
@@ -294,7 +294,7 @@ export default function CampaignsPage() {
 
       {/* Delete Confirm */}
       {showDeleteConfirm !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4" onClick={() => setShowDeleteConfirm(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4" onClick={() => setShowDeleteConfirm(null)}>
           <div className="w-full max-w-sm rounded-lg bg-card p-6 card-shadow modal-scale-in" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-foreground mb-2">Delete Campaign</h3>
             <p className="text-sm text-muted-foreground mb-6">Are you sure you want to delete this campaign?</p>

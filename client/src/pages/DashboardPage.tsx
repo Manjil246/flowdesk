@@ -146,7 +146,7 @@ export default function DashboardPage() {
 
       {/* Bot Logs Modal */}
       {showBotLogs && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4" onClick={() => setShowBotLogs(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4" onClick={() => setShowBotLogs(false)}>
           <div className="w-full max-w-2xl rounded-lg bg-card p-6 card-shadow modal-scale-in max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground">Bot Logs</h3>
@@ -174,7 +174,7 @@ export default function DashboardPage() {
 
       {/* All Activity Modal */}
       {showAllActivity && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-xs p-4" onClick={() => setShowAllActivity(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4" onClick={() => setShowAllActivity(false)}>
           <div className="w-full max-w-lg rounded-lg bg-card p-6 card-shadow modal-scale-in max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground">All Activity</h3>

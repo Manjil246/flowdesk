@@ -22,6 +22,17 @@ export const LOCAL_DEVELOPMENT_URL = process.env.LOCAL_DEVELOPMENT_URL || "";
 export const MONGODB_URI =
   process.env.MONGODB_URI || process.env.MONGO_URI || "";
 
+/** Cloudinary (signed uploads from dashboard). All three required for signature endpoint. */
+export const CLOUDINARY_CLOUD_NAME =
+  process.env.CLOUDINARY_CLOUD_NAME?.trim() || "";
+export const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY?.trim() || "";
+export const CLOUDINARY_API_SECRET =
+  process.env.CLOUDINARY_API_SECRET?.trim() || "";
+
+/** Folder prefix for catalog images (`public_id` is under this path + uuid). */
+export const CLOUDINARY_CATALOG_FOLDER =
+  process.env.CLOUDINARY_CATALOG_FOLDER?.trim() || "flowdesk/catalog";
+
 /** Meta webhook verification — must match the Verify Token in Meta Developer Console. */
 export const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "";
 

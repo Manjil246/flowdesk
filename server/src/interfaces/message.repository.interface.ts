@@ -62,6 +62,7 @@ export interface IMessageRepository {
   findRecentTextTurnsForChat(
     conversationId: string,
     limit: number,
+    after?: Date,
   ): Promise<RecentChatTurn[]>;
 
   /** Returns whether a new row was inserted (`duplicate` = idempotent replay). */

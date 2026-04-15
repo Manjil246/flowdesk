@@ -32,13 +32,12 @@ Related model fields today: `isArchived`, `isSpam`, `tags` on `Conversation` (`s
 
 ## Catalogue & assets
 
-- Supply **real** product JPEGs/PNGs under `server/public/products/` with names from `product-image-map.ts`.
-- Production **`BACKEND_BASE_URL`** (public HTTPS) so Meta can fetch `image.link` for outbound catalog photos.
+- Ensure each **product color** in Mongo has a reachable **`imageUrl`** (HTTPS, e.g. Cloudinary) for WhatsApp outbound images.
 
 ---
 
 ## Other quality / ops (when needed)
 
-- Unit tests for tool-arg Zod schemas, image URL resolver, webhook idempotency helpers.
-- Pre-deploy check: all mapped SKUs have image files on disk.
+- Unit tests for tool-arg Zod schemas, webhook idempotency helpers.
+- Pre-deploy check: active catalog colors used by the bot have valid `imageUrl` values.
 - Rate limiting / dedupe if outbound tool calls are ever abused.
