@@ -61,7 +61,14 @@ export class WebhookPersistenceService implements IWebhookPersistenceService {
     const type = (msg.type as string) || "unknown";
     const ts = metaTsToDate(msg.timestamp as string | undefined);
 
-    const { text, mediaId, mediaCaption, interactiveReply, replyToMessageId } =
+    const {
+      text,
+      locationData,
+      mediaId,
+      mediaCaption,
+      interactiveReply,
+      replyToMessageId,
+    } =
       extractMessageContent(msg, type);
 
     const conv = await this.conversationRepository.upsertInboundByPhone(
@@ -114,6 +121,7 @@ export class WebhookPersistenceService implements IWebhookPersistenceService {
           conversationId,
           messageType: type,
           text,
+          locationData,
           botMode: conv.botMode,
         })
         .catch((err: unknown) => {

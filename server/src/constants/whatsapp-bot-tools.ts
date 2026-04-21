@@ -115,38 +115,107 @@ export const LADIES_FASHION_WHATSAPP_TOOLS = [
   {
     type: "function" as const,
     function: {
-      name: "place_order",
+      name: "add_to_cart",
       description:
-        "Save the confirmed order. Call after billing recap with NPR 150 delivery. Backend fills product, colour, size, and price from session state — you only provide quantity, phone, location, and verification. On success returns orderReference (e.g. SS-20260414-A1B2C3) — you MUST give that code in the thank-you.",
+        "Adds the currently selected product (with confirmed size, color, and quantity) to the cart. Call this after the customer confirms the price and provides quantity. The backend resolves product details from session. After calling this, show the updated cart summary.",
       parameters: {
         type: "object",
         properties: {
           quantity: {
             type: "integer",
-            description: "Number of pieces the customer wants.",
-          },
-          customerOrderPhone: {
-            type: "string",
-            description:
-              "Callback / order phone the customer gave (E.164 or local digits as typed).",
-          },
-          deliveryLocation: {
-            type: "string",
-            description:
-              "Full delivery address or area text the customer confirmed.",
-          },
-          locationVerified: {
-            type: "boolean",
-            description:
-              "True if the address was clear or they confirmed after double-check.",
+            minimum: 1,
           },
         },
-        required: [
-          "quantity",
-          "customerOrderPhone",
-          "deliveryLocation",
-          "locationVerified",
-        ],
+        required: ["quantity"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "view_cart",
+      description:
+        "Returns current cart contents. Call when customer wants to see their cart, or after adding/removing an item. Use the result to show a formatted cart summary to the customer.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [] as string[],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "remove_from_cart",
+      description:
+        "Removes an item from the cart by its cart item number. Call when customer asks to remove an item.",
+      parameters: {
+        type: "object",
+        properties: {
+          itemNumber: { type: "integer", minimum: 1 },
+        },
+        required: ["itemNumber"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "initiate_checkout",
+      description:
+        "Marks the cart as ready for checkout and starts the checkout flow. Call when customer confirms they want to proceed to checkout from the cart view. This transitions the flow to location collection.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [] as string[],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "set_checkout_location",
+      description:
+        "Saves the customer delivery location. Call when customer shares their WhatsApp location pin OR after they confirm a manually entered address. Pass structured location data if received from WhatsApp location message, or manual address string if entered as text.",
+      parameters: {
+        type: "object",
+        properties: {
+          lat: { type: "number" },
+          lng: { type: "number" },
+          name: { type: "string" },
+          address: { type: "string" },
+          raw: { type: "string" },
+          isManual: { type: "boolean" },
+        },
+        required: ["raw", "isManual"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "set_checkout_phone",
+      description:
+        "Saves the customer phone number for order callback. Call after location is confirmed and customer provides their phone number.",
+      parameters: {
+        type: "object",
+        properties: {
+          phone: { type: "string" },
+        },
+        required: ["phone"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "place_order",
+      description:
+        "Places the order using all items in the cart and the saved delivery location and phone number. Only call after customer confirms the final billing recap. All order data is read from session — no arguments needed.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [] as string[],
       },
     },
   },

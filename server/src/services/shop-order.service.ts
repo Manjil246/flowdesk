@@ -106,6 +106,8 @@ export class ShopOrderService {
       customerWaPhone,
       customerOrderPhone: args.customerOrderPhone,
       deliveryLocation: args.deliveryLocation,
+      deliveryLocationLat: args.deliveryLocationLat ?? null,
+      deliveryLocationLng: args.deliveryLocationLng ?? null,
       locationVerified: args.locationVerified,
       currency: args.currency ?? "NPR",
       lineItems,

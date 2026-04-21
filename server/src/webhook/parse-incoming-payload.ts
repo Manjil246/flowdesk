@@ -11,12 +11,26 @@ export function extractMessageContent(
   type: string,
 ): {
   text: string;
+  locationData: {
+    lat?: number;
+    lng?: number;
+    name?: string;
+    address?: string;
+    raw: string;
+  } | null;
   mediaId: string | null;
   mediaCaption: string | null;
   interactiveReply: { buttonId: string; buttonTitle: string } | null;
   replyToMessageId: string | null;
 } {
   let text = "";
+  let locationData: {
+    lat?: number;
+    lng?: number;
+    name?: string;
+    address?: string;
+    raw: string;
+  } | null = null;
   let mediaId: string | null = null;
   let mediaCaption: string | null = null;
   let interactiveReply: { buttonId: string; buttonTitle: string } | null = null;
@@ -62,9 +76,24 @@ export function extractMessageContent(
       latitude?: number;
       longitude?: number;
       name?: string;
+      address?: string;
     };
-    text = loc.name ?? `${loc.latitude ?? ""},${loc.longitude ?? ""}`;
+    locationData = {
+      lat: loc.latitude,
+      lng: loc.longitude,
+      name: loc.name,
+      address: loc.address,
+      raw: loc.name ?? loc.address ?? `${loc.latitude ?? ""},${loc.longitude ?? ""}`,
+    };
+    text = locationData.raw;
   }
 
-  return { text, mediaId, mediaCaption, interactiveReply, replyToMessageId };
+  return {
+    text,
+    locationData,
+    mediaId,
+    mediaCaption,
+    interactiveReply,
+    replyToMessageId,
+  };
 }

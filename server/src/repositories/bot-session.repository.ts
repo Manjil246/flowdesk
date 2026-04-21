@@ -29,6 +29,27 @@ export type ProductDetailSnapshot = {
   sizes: string[];
   colors: NumberedColor[];
 };
+export type CartItem = {
+  n: number;
+  productId: string;
+  colorId: string;
+  productName: string;
+  size: string;
+  colorName: string;
+  colorN: number;
+  unitPrice: number;
+  quantity: number;
+  imageUrl: string;
+  currency: string;
+};
+export type CheckoutLocation = {
+  lat?: number;
+  lng?: number;
+  name?: string;
+  address?: string;
+  raw: string;
+  isManual: boolean;
+};
 export type BotSessionLean = {
   _id: mongoose.Types.ObjectId;
   conversationId: mongoose.Types.ObjectId;
@@ -38,6 +59,10 @@ export type BotSessionLean = {
   selectedSize: string | null;
   selectedColorN: number | null;
   imageSent: boolean;
+  cart: CartItem[];
+  checkoutLocation: CheckoutLocation | null;
+  checkoutPhone: string | null;
+  checkoutStarted: boolean;
   orderPlacedAt?: Date | null;
   sessionStartedAt: Date;
 };
@@ -71,6 +96,10 @@ export class BotSessionRepository {
           selectedSize: null,
           selectedColorN: null,
           imageSent: false,
+          cart: [],
+          checkoutLocation: null,
+          checkoutPhone: null,
+          checkoutStarted: false,
           orderPlacedAt: null,
           sessionStartedAt: new Date(),
         },
@@ -171,19 +200,30 @@ export class BotSessionRepository {
     await BotSession.updateOne(
       { conversationId: new mongoose.Types.ObjectId(conversationId) },
       {
+        $unset: {
+          products: "",
+          productDetail: "",
+          selectedSize: "",
+          selectedColorN: "",
+          imageSent: "",
+          orderPlacedAt: "",
+          cart: "",
+          checkoutLocation: "",
+          checkoutPhone: "",
+        },
         $set: {
-          products: [],
-          productDetail: null,
-          selectedSize: null,
-          selectedColorN: null,
-          imageSent: false,
-          orderPlacedAt: null,
+          checkoutStarted: false,
+          sessionStartedAt: new Date(),
         },
       },
     );
   }
 
   async changeProduct(conversationId: string): Promise<void> {
+    await this.clearActiveSelection(conversationId);
+  }
+
+  async clearActiveSelection(conversationId: string): Promise<void> {
     await BotSession.updateOne(
       { conversationId: new mongoose.Types.ObjectId(conversationId) },
       {
@@ -201,16 +241,116 @@ export class BotSessionRepository {
     await BotSession.updateOne(
       { conversationId: new mongoose.Types.ObjectId(conversationId) },
       {
+        $unset: {
+          products: "",
+          productDetail: "",
+          selectedSize: "",
+          selectedColorN: "",
+          imageSent: "",
+          cart: "",
+          checkoutLocation: "",
+          checkoutPhone: "",
+        },
         $set: {
-          products: [],
+          orderPlacedAt: new Date(),
+          checkoutStarted: false,
+          sessionStartedAt: new Date(),
+        },
+      },
+    );
+  }
+
+  async addToCart(
+    conversationId: string,
+    quantity: number,
+  ): Promise<CartItem | null> {
+    const session = await this.getOrCreate(conversationId);
+    const selections = this.resolveSelections(session);
+    if (!selections) return null;
+    if (session.selectedColorN == null) return null;
+
+    const cartItem: CartItem = {
+      n: (session.cart?.length ?? 0) + 1,
+      productId: selections.productId,
+      colorId: selections.colorId,
+      productName: selections.productName,
+      size: selections.size,
+      colorName: selections.colorName,
+      colorN: session.selectedColorN,
+      unitPrice: selections.unitPrice,
+      quantity,
+      imageUrl: selections.imageUrl,
+      currency: selections.currency || "NPR",
+    };
+
+    await BotSession.updateOne(
+      { conversationId: new mongoose.Types.ObjectId(conversationId) },
+      {
+        $push: { cart: cartItem },
+        $set: {
           productDetail: null,
           selectedSize: null,
           selectedColorN: null,
           imageSent: false,
-          orderPlacedAt: new Date(),
-          sessionStartedAt: new Date(),
         },
       },
+    );
+    return cartItem;
+  }
+
+  async removeFromCart(conversationId: string, itemN: number): Promise<void> {
+    const session = await this.getOrCreate(conversationId);
+    const remaining = (session.cart ?? [])
+      .filter((item) => item.n !== itemN)
+      .map((item, idx) => ({ ...item, n: idx + 1 }));
+
+    await BotSession.updateOne(
+      { conversationId: new mongoose.Types.ObjectId(conversationId) },
+      { $set: { cart: remaining } },
+    );
+  }
+
+  async clearCart(conversationId: string): Promise<void> {
+    await BotSession.updateOne(
+      { conversationId: new mongoose.Types.ObjectId(conversationId) },
+      { $set: { cart: [] } },
+    );
+  }
+
+  async setCheckoutLocation(
+    conversationId: string,
+    location: CheckoutLocation,
+  ): Promise<void> {
+    await BotSession.updateOne(
+      { conversationId: new mongoose.Types.ObjectId(conversationId) },
+      { $set: { checkoutLocation: location } },
+    );
+  }
+
+  async setCheckoutPhone(conversationId: string, phone: string): Promise<void> {
+    await BotSession.updateOne(
+      { conversationId: new mongoose.Types.ObjectId(conversationId) },
+      { $set: { checkoutPhone: phone } },
+    );
+  }
+
+  async clearCheckout(conversationId: string): Promise<void> {
+    await BotSession.updateOne(
+      { conversationId: new mongoose.Types.ObjectId(conversationId) },
+      {
+        $set: {
+          checkoutLocation: null,
+          checkoutPhone: null,
+          checkoutStarted: false,
+        },
+      },
+    );
+  }
+
+  async setCheckoutStarted(conversationId: string): Promise<void> {
+    await BotSession.updateOne(
+      { conversationId: new mongoose.Types.ObjectId(conversationId) },
+      { $set: { checkoutStarted: true } },
     );
   }
 

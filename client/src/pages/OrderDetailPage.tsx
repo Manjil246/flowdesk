@@ -106,7 +106,7 @@ export default function OrderDetailPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-3 min-w-0">
           <Button variant="ghost" size="sm" className="-ml-2 h-8 text-muted-foreground" asChild>
-            <Link to="/orders" className="gap-2">
+            <Link to="/admin/orders" className="gap-2">
               <ArrowLeft className="h-4 w-4" />
               Back to orders
             </Link>
@@ -398,7 +398,7 @@ export default function OrderDetailPage() {
       {order && !isLoading && (
         <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md p-3 md:hidden flex justify-end gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <Button variant="outline" size="sm" asChild>
-            <Link to="/orders">List</Link>
+            <Link to="/admin/orders">List</Link>
           </Button>
           <Button
             size="sm"
@@ -414,3 +414,4 @@ export default function OrderDetailPage() {
     </div>
   );
 }
+

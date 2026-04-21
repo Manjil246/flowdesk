@@ -40,6 +40,35 @@ const productDetailSnapshotSchema = new Schema(
   { _id: false },
 );
 
+const cartItemSchema = new Schema(
+  {
+    n: { type: Number, required: true },
+    productId: { type: String, required: true },
+    colorId: { type: String, required: true },
+    productName: { type: String, required: true },
+    size: { type: String, required: true },
+    colorName: { type: String, required: true },
+    colorN: { type: Number, required: true },
+    unitPrice: { type: Number, required: true },
+    quantity: { type: Number, required: true },
+    imageUrl: { type: String, required: true },
+    currency: { type: String, default: "NPR" },
+  },
+  { _id: false },
+);
+
+const checkoutLocationSchema = new Schema(
+  {
+    lat: { type: Number },
+    lng: { type: Number },
+    name: { type: String },
+    address: { type: String },
+    raw: { type: String },
+    isManual: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
 const botSessionSchema = new Schema(
   {
     conversationId: {
@@ -53,6 +82,10 @@ const botSessionSchema = new Schema(
     selectedSize: { type: String, default: null },
     selectedColorN: { type: Number, default: null },
     imageSent: { type: Boolean, default: false },
+    cart: { type: [cartItemSchema], default: [] },
+    checkoutLocation: { type: checkoutLocationSchema, default: null },
+    checkoutPhone: { type: String, default: null },
+    checkoutStarted: { type: Boolean, default: false },
     orderPlacedAt: { type: Date, default: null },
     sessionStartedAt: { type: Date, default: Date.now },
   },

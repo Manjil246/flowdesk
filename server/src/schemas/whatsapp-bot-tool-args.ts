@@ -39,22 +39,39 @@ export const sendProductImageToolArgsSchema = z.object({
 });
 export type SendProductImageToolArgs = z.infer<typeof sendProductImageToolArgsSchema>;
 
-/** place_order — backend fills product/color/price from session state. */
-export const placeOrderToolArgsSchema = z.object({
-  quantity: z.coerce.number().int().min(1).max(999),
-  customerOrderPhone: z
-    .string()
-    .min(6)
-    .max(40)
-    .transform((s) => s.trim()),
-  deliveryLocation: z
-    .string()
-    .min(2)
-    .max(2000)
-    .transform((s) => s.trim()),
-  locationVerified: z.boolean(),
-  currency: z.literal("NPR").optional().default("NPR"),
+export const addToCartToolArgsSchema = z.object({
+  quantity: z.coerce.number().int().min(1),
 });
+export type AddToCartToolArgs = z.infer<typeof addToCartToolArgsSchema>;
+
+export const viewCartToolArgsSchema = z.object({}).passthrough();
+export type ViewCartToolArgs = z.infer<typeof viewCartToolArgsSchema>;
+
+export const removeFromCartToolArgsSchema = z.object({
+  itemNumber: z.coerce.number().int().min(1),
+});
+export type RemoveFromCartToolArgs = z.infer<typeof removeFromCartToolArgsSchema>;
+
+export const initiateCheckoutToolArgsSchema = z.object({}).passthrough();
+export type InitiateCheckoutToolArgs = z.infer<typeof initiateCheckoutToolArgsSchema>;
+
+export const setCheckoutLocationToolArgsSchema = z.object({
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  name: z.string().optional(),
+  address: z.string().optional(),
+  raw: z.string(),
+  isManual: z.boolean(),
+});
+export type SetCheckoutLocationToolArgs = z.infer<typeof setCheckoutLocationToolArgsSchema>;
+
+export const setCheckoutPhoneToolArgsSchema = z.object({
+  phone: z.string().min(1),
+});
+export type SetCheckoutPhoneToolArgs = z.infer<typeof setCheckoutPhoneToolArgsSchema>;
+
+/** place_order — reads checkout data from session, no arguments required. */
+export const placeOrderToolArgsSchema = z.object({}).passthrough();
 export type PlaceOrderToolArgs = z.infer<typeof placeOrderToolArgsSchema>;
 
 /** get_order_status — human-readable order reference. */

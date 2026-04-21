@@ -17,6 +17,8 @@ export type OrderCreateInput = {
   customerWaPhone: string;
   customerOrderPhone: string;
   deliveryLocation: string;
+  deliveryLocationLat?: number | null;
+  deliveryLocationLng?: number | null;
   locationVerified: boolean;
   currency: string;
   lineItems: OrderLineItemInput[];
