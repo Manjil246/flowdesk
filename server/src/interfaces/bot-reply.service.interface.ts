@@ -2,6 +2,13 @@ export type BotReplyAfterInboundInput = {
   conversationId: string;
   messageType: string;
   text: string;
+  locationData?: {
+    lat?: number;
+    lng?: number;
+    name?: string;
+    address?: string;
+    raw: string;
+  } | null;
   botMode: boolean;
 };
 

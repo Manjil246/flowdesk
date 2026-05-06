@@ -314,7 +314,7 @@ export default function LeadsPage() {
               <textarea defaultValue={viewLead.notes} className="mt-1 w-full rounded-md border border-border bg-muted/30 px-3 py-2 text-sm outline-hidden" rows={3} placeholder="Add notes about this lead..." />
             </div>
             <div className="mt-4 flex gap-2">
-              <button onClick={() => { setViewLead(null); navigate("/conversations"); }} className="flex-1 flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+              <button onClick={() => { setViewLead(null); navigate("/admin/conversations"); }} className="flex-1 flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
                 <MessageSquare className="h-4 w-4" /> Send Message
               </button>
               <button onClick={() => setViewLead(null)} className="flex-1 rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">Close</button>

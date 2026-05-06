@@ -8,6 +8,7 @@ import type { IWhatsAppRepository } from "../interfaces/whatsapp.repository.inte
 import type {
   IWhatsAppService,
   SendWhatsAppImageByLinkInput,
+  SendWhatsAppLocationRequestInput,
   SendWhatsAppTextInput,
   SendWhatsAppTextResult,
 } from "../interfaces/whatsapp.service.interface";
@@ -267,6 +268,111 @@ export class WhatsAppService implements IWhatsAppService {
     await this.whatsAppRepository.updateConversationAfterOutbound(
       input.conversationId,
       lastPreview,
+      now,
+    );
+
+    return { waMessageId, mongoMessageId };
+  }
+
+  async sendLocationRequestMessage(
+    input: SendWhatsAppLocationRequestInput,
+  ): Promise<SendWhatsAppTextResult> {
+    if (!isMongoReady()) {
+      throw new DbNotReadyError();
+    }
+
+    const token = WHATSAPP_TOKEN.trim();
+    const phoneNumberId = PHONE_NUMBER_ID.trim();
+    const businessPhone = WHATSAPP_BUSINESS_PHONE.trim();
+
+    if (!token || !phoneNumberId) {
+      throw new WhatsAppConfigError(
+        "Missing WHATSAPP_TOKEN or PHONE_NUMBER_ID for sending messages.",
+      );
+    }
+    if (!businessPhone) {
+      throw new WhatsAppConfigError(
+        "Missing WHATSAPP_BUSINESS_PHONE (E.164) for storing outbound messages.",
+      );
+    }
+
+    const ctx = await this.whatsAppRepository.findConversationSendContext(
+      input.conversationId,
+    );
+    if (!ctx) {
+      throw new NotFoundError("Conversation not found");
+    }
+    if (ctx.isArchived) {
+      throw new BadRequestError("Cannot send to an archived conversation");
+    }
+
+    const customerE164 = normalizeWaPhone(ctx.phone);
+    const to = toWhatsAppCloudRecipientId(customerE164);
+    if (!to) {
+      throw new BadRequestError("Invalid customer phone on conversation");
+    }
+
+    const bodyText = (input.bodyText ?? "").trim();
+    if (!bodyText) {
+      throw new BadRequestError("Location request body text cannot be empty");
+    }
+
+    const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        type: "interactive",
+        to,
+        interactive: {
+          type: "location_request_message",
+          body: { text: bodyText },
+          action: { name: "send_location" },
+        },
+      }),
+    });
+
+    const json = (await res.json()) as GraphSendTextResponse;
+    if (!res.ok) {
+      const msg = json.error?.message ?? `Graph API error (${res.status})`;
+      throw new WhatsAppApiError(msg, res.status, json);
+    }
+
+    const waMessageId = json.messages?.[0]?.id;
+    if (!waMessageId) {
+      throw new WhatsAppApiError(
+        "Graph API response missing messages[0].id",
+        res.status,
+        json,
+      );
+    }
+
+    const now = new Date();
+    const fromPhoneE164 = normalizeWaPhone(businessPhone);
+    const { mongoMessageId } =
+      await this.whatsAppRepository.insertOutboundMessage({
+        conversationId: ctx._id,
+        leadId: ctx.leadId,
+        messageId: waMessageId,
+        from: input.senderRole,
+        fromPhone: fromPhoneE164,
+        toPhone: customerE164,
+        text: bodyText,
+        timestamp: now,
+        status: "pending",
+        type: "interactive",
+        isInbound: false,
+        toolTrace: input.toolTrace?.length ? input.toolTrace : undefined,
+      });
+
+    await this.whatsAppRepository.updateConversationAfterOutbound(
+      input.conversationId,
+      bodyText,
       now,
     );
 

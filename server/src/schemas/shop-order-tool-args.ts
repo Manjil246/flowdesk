@@ -16,6 +16,8 @@ export const saveShopOrderToolArgsSchema = z.object({
     .min(2)
     .max(2000)
     .transform((s) => s.trim()),
+  deliveryLocationLat: z.number().optional(),
+  deliveryLocationLng: z.number().optional(),
   locationVerified: z.boolean(),
   items: z
     .array(

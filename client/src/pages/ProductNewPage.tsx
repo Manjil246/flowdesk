@@ -206,7 +206,7 @@ export default function ProductNewPage() {
     onSuccess: (detail) => {
       toast.success("Product created");
       qc.invalidateQueries({ queryKey: ["products"] });
-      navigate(`/products/${detail.product.id}`);
+      navigate(`/admin/products/${detail.product.id}`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -234,7 +234,7 @@ export default function ProductNewPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <Button variant="ghost" size="sm" className="w-fit -ml-2 gap-1" asChild>
-            <Link to="/products">
+            <Link to="/admin/products">
               <ArrowLeft className="h-4 w-4" />
               Products
             </Link>
@@ -561,7 +561,7 @@ export default function ProductNewPage() {
 
       <div className="flex flex-wrap gap-3 justify-end pt-2">
         <Button variant="outline" asChild>
-          <Link to="/products">Cancel</Link>
+          <Link to="/admin/products">Cancel</Link>
         </Button>
         <Button
           onClick={() => saveMutation.mutate()}
@@ -576,3 +576,4 @@ export default function ProductNewPage() {
     </div>
   );
 }
+

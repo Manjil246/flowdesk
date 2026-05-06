@@ -52,9 +52,9 @@ export default function DashboardPage() {
   );
 
   const handleActivityClick = (type: string) => {
-    if (type === "message") navigate("/conversations");
-    else if (type === "lead") navigate("/leads");
-    else if (type === "campaign") navigate("/campaigns");
+    if (type === "message") navigate("/admin/conversations");
+    else if (type === "lead") navigate("/admin/leads");
+    else if (type === "campaign") navigate("/admin/campaigns");
   };
 
   return (
@@ -111,13 +111,13 @@ export default function DashboardPage() {
         <div className="lg:col-span-2 rounded-lg border border-border bg-card p-5 card-shadow">
           <h3 className="mb-4 text-base font-semibold text-foreground">Quick Actions</h3>
           <div className="space-y-3">
-            <button onClick={() => navigate("/campaigns")} className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors btn-hover-shadow">
+            <button onClick={() => navigate("/admin/campaigns")} className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors btn-hover-shadow">
               <Send className="h-4 w-4" /> Send Bulk Message
             </button>
-            <button onClick={() => navigate("/leads")} className="flex w-full items-center justify-center gap-2 rounded-md border border-primary px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/5 transition-colors">
+            <button onClick={() => navigate("/admin/leads")} className="flex w-full items-center justify-center gap-2 rounded-md border border-primary px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/5 transition-colors">
               <Plus className="h-4 w-4" /> Add New Lead
             </button>
-            <button onClick={() => navigate("/campaigns")} className="flex w-full items-center justify-center gap-2 rounded-md border border-primary px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/5 transition-colors">
+            <button onClick={() => navigate("/admin/campaigns")} className="flex w-full items-center justify-center gap-2 rounded-md border border-primary px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/5 transition-colors">
               <Megaphone className="h-4 w-4" /> Create Campaign
             </button>
             <button onClick={() => setShowBotLogs(true)} className="flex w-full items-center justify-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted/50 transition-colors">

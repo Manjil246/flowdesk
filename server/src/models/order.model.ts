@@ -34,6 +34,8 @@ const orderSchema = new Schema(
     customerWaPhone: { type: String, required: true, trim: true },
     customerOrderPhone: { type: String, required: true, trim: true },
     deliveryLocation: { type: String, required: true, trim: true },
+    deliveryLocationLat: { type: Number, default: null },
+    deliveryLocationLng: { type: Number, default: null },
     locationVerified: { type: Boolean, required: true, default: false },
     currency: { type: String, required: true, default: "NPR", trim: true },
     lineItems: { type: [orderLineItemSchema], required: true },

@@ -98,7 +98,7 @@ export default function ProductsPage() {
           disabled={categories.length === 0}
           asChild
         >
-          <Link to="/products/new">
+          <Link to="/admin/products/new">
             <Plus className="h-4 w-4" />
             New product
           </Link>
@@ -195,7 +195,7 @@ export default function ProductsPage() {
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">
                           <Link
-                            to={`/products/${p.id}`}
+                            to={`/admin/products/${p.id}`}
                             className="hover:text-primary hover:underline"
                           >
                             {p.name}
@@ -226,7 +226,7 @@ export default function ProductsPage() {
                         </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                            <Link to={`/products/${p.id}`} title="Edit">
+                            <Link to={`/admin/products/${p.id}`} title="Edit">
                               <Pencil className="h-4 w-4" />
                             </Link>
                           </Button>
@@ -274,3 +274,4 @@ export default function ProductsPage() {
     </div>
   );
 }
+

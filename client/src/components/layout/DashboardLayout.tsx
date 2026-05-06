@@ -4,15 +4,15 @@ import AppSidebar from "./AppSidebar";
 import AppHeader from "./AppHeader";
 
 const pageTitles: Record<string, string> = {
-  "/": "Dashboard",
-  "/conversations": "Conversations",
-  "/leads": "Leads Management",
-  "/campaigns": "Campaigns",
-  "/bot-settings": "Bot Configuration",
-  "/settings": "Settings",
-  "/categories": "Categories",
-  "/products": "Products",
-  "/orders": "Orders",
+  "/admin": "Dashboard",
+  "/admin/conversations": "Conversations",
+  "/admin/leads": "Leads Management",
+  "/admin/campaigns": "Campaigns",
+  "/admin/bot-settings": "Bot Configuration",
+  "/admin/settings": "Settings",
+  "/admin/categories": "Categories",
+  "/admin/products": "Products",
+  "/admin/orders": "Orders",
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

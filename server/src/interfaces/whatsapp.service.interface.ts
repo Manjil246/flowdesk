@@ -17,6 +17,13 @@ export type SendWhatsAppImageByLinkInput = {
   toolTrace?: OutboundToolTraceEntry[];
 };
 
+export type SendWhatsAppLocationRequestInput = {
+  conversationId: string;
+  bodyText: string;
+  senderRole: "bot";
+  toolTrace?: OutboundToolTraceEntry[];
+};
+
 export type SendWhatsAppTextResult = {
   waMessageId: string;
   mongoMessageId: string;
@@ -27,5 +34,9 @@ export interface IWhatsAppService {
 
   sendImageByLink(
     input: SendWhatsAppImageByLinkInput,
+  ): Promise<SendWhatsAppTextResult>;
+
+  sendLocationRequestMessage(
+    input: SendWhatsAppLocationRequestInput,
   ): Promise<SendWhatsAppTextResult>;
 }

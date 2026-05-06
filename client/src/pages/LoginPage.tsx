@@ -19,7 +19,7 @@ export default function LoginPage() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      navigate("/");
+      navigate("/admin");
     }, 800);
   };
 

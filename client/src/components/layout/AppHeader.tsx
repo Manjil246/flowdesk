@@ -154,7 +154,7 @@ export default function AppHeader({ title, onMenuClick }: AppHeaderProps) {
             <p className="text-sm text-muted-foreground mb-6">Are you sure you want to logout?</p>
             <div className="flex gap-3">
               <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">Cancel</button>
-              <button onClick={() => { setShowLogoutConfirm(false); navigate("/login"); }} className="flex-1 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors">Logout</button>
+              <button onClick={() => { setShowLogoutConfirm(false); navigate("/admin/login"); }} className="flex-1 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors">Logout</button>
             </div>
           </div>
         </div>

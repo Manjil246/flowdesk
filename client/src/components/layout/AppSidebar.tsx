@@ -17,15 +17,15 @@ import {
 import { toast } from "sonner";
 
 const navItems = [
-  { title: "Dashboard", path: "/", icon: LayoutDashboard },
-  { title: "Conversations", path: "/conversations", icon: MessageSquare },
-  { title: "Leads", path: "/leads", icon: Users },
-  { title: "Campaigns", path: "/campaigns", icon: Megaphone },
-  { title: "Categories", path: "/categories", icon: FolderTree },
-  { title: "Products", path: "/products", icon: Package },
-  { title: "Orders", path: "/orders", icon: ShoppingBag },
-  { title: "Bot Settings", path: "/bot-settings", icon: Bot },
-  { title: "Settings", path: "/settings", icon: Settings },
+  { title: "Dashboard", path: "/admin", icon: LayoutDashboard },
+  { title: "Conversations", path: "/admin/conversations", icon: MessageSquare },
+  { title: "Leads", path: "/admin/leads", icon: Users },
+  { title: "Campaigns", path: "/admin/campaigns", icon: Megaphone },
+  { title: "Categories", path: "/admin/categories", icon: FolderTree },
+  { title: "Products", path: "/admin/products", icon: Package },
+  { title: "Orders", path: "/admin/orders", icon: ShoppingBag },
+  { title: "Bot Settings", path: "/admin/bot-settings", icon: Bot },
+  { title: "Settings", path: "/admin/settings", icon: Settings },
 ];
 
 interface AppSidebarProps {
@@ -74,9 +74,9 @@ export default function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProp
           {navItems.map((item) => {
             const isActive =
               location.pathname === item.path ||
-              (item.path === "/products" &&
-                location.pathname.startsWith("/products")) ||
-              (item.path === "/orders" && location.pathname.startsWith("/orders"));
+              (item.path === "/admin/products" &&
+                location.pathname.startsWith("/admin/products")) ||
+              (item.path === "/admin/orders" && location.pathname.startsWith("/admin/orders"));
             return (
               <Link
                 key={item.path}
@@ -125,7 +125,7 @@ export default function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProp
             <p className="text-sm text-muted-foreground mb-6">Are you sure you want to logout?</p>
             <div className="flex gap-3">
               <button onClick={() => setShowLogout(false)} className="flex-1 rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">Cancel</button>
-              <button onClick={() => { setShowLogout(false); navigate("/login"); }} className="flex-1 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors">Logout</button>
+              <button onClick={() => { setShowLogout(false); navigate("/admin/login"); }} className="flex-1 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors">Logout</button>
             </div>
           </div>
         </div>

@@ -310,7 +310,7 @@ export default function ProductEditPage() {
     <div className="space-y-6 p-4 md:p-6 max-w-4xl">
       <div className="flex items-center gap-3">
         <Button variant="outline" size="icon" asChild>
-          <Link to="/products">
+          <Link to="/admin/products">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
@@ -806,3 +806,4 @@ export default function ProductEditPage() {
     </div>
   );
 }
+
