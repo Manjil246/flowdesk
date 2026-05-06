@@ -125,6 +125,255 @@ export class BotReplyService implements IBotReplyService {
     private readonly botSessionRepo: BotSessionRepository,
   ) {}
 
+  private mapCatalogError(e: unknown): string {
+    if (e instanceof DbNotReadyError) {
+      return JSON.stringify({
+        ok: false,
+        error: "database_unavailable",
+      });
+    }
+    if (e instanceof NotFoundError) {
+      return JSON.stringify({ ok: false, error: "not_found" });
+    }
+    if (e instanceof BadRequestError) {
+      return JSON.stringify({
+        ok: false,
+        error: "bad_request",
+        message: e.message,
+      });
+    }
+    const m = e instanceof Error ? e.message : String(e);
+    return JSON.stringify({ ok: false, error: m });
+  }
+
+  private async handleSelectProduct(
+    productNumber: number,
+    conversationId: string,
+  ): Promise<string> {
+    try {
+      const session = await this.botSessionRepo.getOrCreate(conversationId);
+      const prod = session.products.find((p) => p.n === productNumber);
+      if (!prod) {
+        return JSON.stringify({
+          ok: false,
+          error: "invalid_product_number",
+          message: `No product with number ${productNumber}. Available: ${session.products.map((p) => `${p.n}=${p.name}`).join(", ") || "none (call browse_products first)"}`,
+        });
+      }
+      const detail = await this.catalogService.getProductDetail(prod.id);
+      const numberedColors = detail.colors.filter((c) => c.active).map((c, i) => ({
+        n: i + 1,
+        id: c.id,
+        name: c.colorName || c.colorNameEn || `Color ${i + 1}`,
+        imageUrl: c.imageUrl,
+      }));
+      const snapshot = {
+        productId: detail.product.id,
+        productName: detail.product.name,
+        description: detail.product.description,
+        fabric: detail.product.fabric,
+        occasions: detail.product.occasions,
+        basePrice: detail.product.basePrice,
+        currency: detail.product.currency,
+        sizes: detail.product.allowedSizes,
+        colors: numberedColors,
+      };
+      await this.botSessionRepo.setProductDetail(conversationId, snapshot);
+
+      const colorsForLLM = numberedColors.map((c) => ({
+        n: c.n,
+        name: c.name,
+      }));
+
+      const stockSummary: Record<
+        string,
+        Array<{ size: string; available: boolean; price: number | null }>
+      > = {};
+      for (const color of detail.colors.filter((c) => c.active)) {
+        const cNum = numberedColors.find((nc) => nc.id === color.id);
+        if (!cNum) continue;
+        stockSummary[`color_${cNum.n}`] = color.stock.filter((s) => s.active).map((s) => ({
+          size: s.size,
+          available: s.isAvailable,
+          price: s.price,
+        }));
+      }
+
+      return JSON.stringify({
+        ok: true,
+        product: detail.product.name,
+        description: detail.product.description,
+        fabric: detail.product.fabric,
+        occasions: detail.product.occasions,
+        basePrice: detail.product.basePrice,
+        currency: detail.product.currency,
+        sizes: detail.product.allowedSizes,
+        colors: colorsForLLM,
+        stockByColor: stockSummary,
+      });
+    } catch (e: unknown) {
+      return this.mapCatalogError(e);
+    }
+  }
+
+  private async handleSelectSize(
+    size: string,
+    conversationId: string,
+  ): Promise<string> {
+    try {
+      const session = await this.botSessionRepo.getOrCreate(conversationId);
+      if (!session.productDetail) {
+        return JSON.stringify({
+          ok: false,
+          error: "no_product_selected",
+          message: "Call select_product first before selecting a size.",
+        });
+      }
+      const validSizes = session.productDetail.sizes;
+      const match = validSizes.find((s) => s.toLowerCase() === size.toLowerCase());
+      if (!match) {
+        return JSON.stringify({
+          ok: false,
+          error: "invalid_size",
+          message: `"${size}" is not available. Valid sizes: ${validSizes.join(", ")}`,
+        });
+      }
+      await this.botSessionRepo.setSize(conversationId, match);
+      return JSON.stringify({
+        ok: true,
+        size: match,
+        product: session.productDetail.productName,
+      });
+    } catch (e: unknown) {
+      return this.mapCatalogError(e);
+    }
+  }
+
+  private async handleSelectColor(
+    colorNumber: number,
+    conversationId: string,
+  ): Promise<string> {
+    try {
+      const session = await this.botSessionRepo.getOrCreate(conversationId);
+      if (!session.productDetail) {
+        return JSON.stringify({
+          ok: false,
+          error: "no_product_selected",
+          message: "Call select_product first before selecting a colour.",
+        });
+      }
+      const color = session.productDetail.colors.find((c) => c.n === colorNumber);
+      if (!color) {
+        return JSON.stringify({
+          ok: false,
+          error: "invalid_color_number",
+          message: `No colour with number ${colorNumber}. Available: ${session.productDetail.colors.map((c) => `${c.n}=${c.name}`).join(", ")}`,
+        });
+      }
+      await this.botSessionRepo.setColor(conversationId, colorNumber);
+      return JSON.stringify({
+        ok: true,
+        colorNumber,
+        colorName: color.name,
+        product: session.productDetail.productName,
+      });
+    } catch (e: unknown) {
+      return this.mapCatalogError(e);
+    }
+  }
+
+  private async handleSendProductImage(
+    conversationId: string,
+    toolTrace: Array<{ name: string; arguments: string; result: string }> = [],
+  ): Promise<string> {
+    try {
+      const session = await this.botSessionRepo.getOrCreate(conversationId);
+      const resolved = this.botSessionRepo.resolveColor(session, undefined);
+      if (!resolved) {
+        return JSON.stringify({
+          ok: false,
+          error: "no_product_or_color",
+          message:
+            "No product selected or no colour available. Call select_product (and optionally select_color) first.",
+        });
+      }
+      const { productId, colorId, imageUrl } = resolved;
+      if (!imageUrl) {
+        return JSON.stringify({
+          ok: false,
+          error: "missing_image_url",
+        });
+      }
+      const mediaRef = `${productId}:${colorId}`;
+      try {
+        const sent = await this.whatsAppService.sendImageByLink({
+          conversationId,
+          imageUrl,
+          mediaRef,
+          senderRole: "bot",
+          toolTrace: [...toolTrace],
+        });
+        await this.botSessionRepo.markImageSent(conversationId);
+        return JSON.stringify({
+          ok: true,
+          sent: true,
+          waMessageId: sent.waMessageId,
+        });
+      } catch (e: unknown) {
+        const m = e instanceof Error ? e.message : String(e);
+        return JSON.stringify({ ok: false, error: m });
+      }
+    } catch (e: unknown) {
+      return this.mapCatalogError(e);
+    }
+  }
+
+  private async handleAddToCart(
+    quantity: number,
+    conversationId: string,
+  ): Promise<string> {
+    const cartItem = await this.botSessionRepo.addToCart(conversationId, quantity);
+    if (!cartItem) {
+      return JSON.stringify({
+        ok: false,
+        error: "no_active_selection",
+        instruction:
+          "Active selection is incomplete. Ensure product, size, and color are selected before adding to cart.",
+      });
+    }
+    const session = await this.botSessionRepo.getOrCreate(conversationId);
+    const items = session.cart.map((item) => ({
+      n: item.n,
+      productName: item.productName,
+      size: item.size,
+      colorName: item.colorName,
+      unitPrice: item.unitPrice,
+      quantity: item.quantity,
+      lineTotal: item.unitPrice * item.quantity,
+      currency: item.currency,
+    }));
+    const subtotal = items.reduce((sum, i) => sum + i.lineTotal, 0);
+    const deliveryCharge = 150;
+    return JSON.stringify({
+      ok: true,
+      addedItem: {
+        productName: cartItem.productName,
+        size: cartItem.size,
+        colorName: cartItem.colorName,
+        unitPrice: cartItem.unitPrice,
+        quantity: cartItem.quantity,
+        lineTotal: cartItem.unitPrice * cartItem.quantity,
+      },
+      cart: {
+        items,
+        subtotal,
+        deliveryCharge,
+        grandTotal: subtotal + deliveryCharge,
+        currency: "NPR",
+      },
+    });
+  }
+
   async maybeReplyAfterInbound(
     input: BotReplyAfterInboundInput,
   ): Promise<void> {
@@ -136,21 +385,146 @@ export class BotReplyService implements IBotReplyService {
     if (!userText) return;
 
     try {
-      const session = await this.botSessionRepo.getOrCreate(input.conversationId);
+      const conversationId = input.conversationId;
+      let session = await this.botSessionRepo.getOrCreate(conversationId);
       const inboundState = deriveFsmState(session);
       if (
         input.messageType === "location" &&
         inboundState !== "CHECKOUT_AWAITING_LOCATION"
       ) {
         await this.whatsAppService.sendTextMessage({
-          conversationId: input.conversationId,
+          conversationId,
           text: "लोकेशन पिन पायौँ। अहिले चलिरहेको चरण पूरा गरौं, चाहिनुपरे फेरि लोकेशन माग्छु।",
           senderRole: "bot",
         });
         return;
       }
+
+      const trimmedText = input.text?.trim() ?? "";
+      const numericReply = /^\d+$/.test(trimmedText)
+        ? parseInt(trimmedText, 10)
+        : null;
+
+      interface SyntheticToolEntry {
+        toolCallId: string;
+        toolName: string;
+        toolArgs: string;
+        toolResult: string;
+      }
+
+      const syntheticTools: SyntheticToolEntry[] = [];
+      let routingPasses = 0;
+      const MAX_ROUTING_PASSES = 4;
+      let inputConsumed = false;
+      while (routingPasses < MAX_ROUTING_PASSES) {
+        routingPasses += 1;
+        const currentFsmState = deriveFsmState(session);
+        let firedThisPass = false;
+
+        if (
+          !inputConsumed &&
+          currentFsmState === "PRODUCT_NOT_SELECTED" &&
+          session.products?.length > 0 &&
+          numericReply !== null &&
+          numericReply >= 1 &&
+          numericReply <= session.products.length &&
+          syntheticTools.every((t) => t.toolName !== "select_product")
+        ) {
+          const result = await this.handleSelectProduct(
+            numericReply,
+            conversationId,
+          );
+          syntheticTools.push({
+            toolCallId: `synthetic_select_product_${Date.now()}`,
+            toolName: "select_product",
+            toolArgs: JSON.stringify({ productNumber: numericReply }),
+            toolResult: result,
+          });
+          session = await this.botSessionRepo.getOrCreate(conversationId);
+          inputConsumed = true;
+          firedThisPass = true;
+        } else if (
+          !inputConsumed &&
+          currentFsmState === "PRODUCT_SELECTED" &&
+          session.productDetail?.sizes?.length &&
+          numericReply !== null &&
+          numericReply >= 1 &&
+          numericReply <= session.productDetail.sizes.length &&
+          syntheticTools.every((t) => t.toolName !== "select_size")
+        ) {
+          const size = session.productDetail.sizes[numericReply - 1];
+          const result = await this.handleSelectSize(size, conversationId);
+          syntheticTools.push({
+            toolCallId: `synthetic_select_size_${Date.now()}`,
+            toolName: "select_size",
+            toolArgs: JSON.stringify({ size }),
+            toolResult: result,
+          });
+          session = await this.botSessionRepo.getOrCreate(conversationId);
+          inputConsumed = true;
+          firedThisPass = true;
+        } else if (
+          !inputConsumed &&
+          currentFsmState === "SIZE_SELECTED" &&
+          session.productDetail?.colors?.length &&
+          numericReply !== null &&
+          numericReply >= 1 &&
+          numericReply <= session.productDetail.colors.length &&
+          syntheticTools.every((t) => t.toolName !== "select_color")
+        ) {
+          const result = await this.handleSelectColor(
+            numericReply,
+            conversationId,
+          );
+          syntheticTools.push({
+            toolCallId: `synthetic_select_color_${Date.now()}`,
+            toolName: "select_color",
+            toolArgs: JSON.stringify({ colorNumber: numericReply }),
+            toolResult: result,
+          });
+          session = await this.botSessionRepo.getOrCreate(conversationId);
+          inputConsumed = true;
+          firedThisPass = true;
+        } else if (
+          currentFsmState === "COLOR_SELECTED" &&
+          syntheticTools.some((t) => t.toolName === "select_color") &&
+          syntheticTools.every((t) => t.toolName !== "send_product_image")
+        ) {
+          const result = await this.handleSendProductImage(conversationId);
+          syntheticTools.push({
+            toolCallId: `synthetic_send_image_${Date.now()}`,
+            toolName: "send_product_image",
+            toolArgs: JSON.stringify({}),
+            toolResult: result,
+          });
+          session = await this.botSessionRepo.getOrCreate(conversationId);
+          firedThisPass = true;
+        } else if (
+          !inputConsumed &&
+          currentFsmState === "IMAGE_SENT" &&
+          numericReply !== null &&
+          numericReply >= 1 &&
+          syntheticTools.every((t) => t.toolName !== "add_to_cart")
+        ) {
+          const result = await this.handleAddToCart(numericReply, conversationId);
+          syntheticTools.push({
+            toolCallId: `synthetic_add_to_cart_${Date.now()}`,
+            toolName: "add_to_cart",
+            toolArgs: JSON.stringify({ quantity: numericReply }),
+            toolResult: result,
+          });
+          session = await this.botSessionRepo.getOrCreate(conversationId);
+          inputConsumed = true;
+          firedThisPass = true;
+        }
+
+        if (!firedThisPass) break;
+      }
+
+      const fsmStateBefore = deriveFsmState(session);
+
       const history = await this.messageRepository.findRecentTextTurnsForChat(
-        input.conversationId,
+        conversationId,
         BOT_REPLY_HISTORY_LIMIT,
         session.sessionStartedAt,
       );
@@ -162,21 +536,50 @@ export class BotReplyService implements IBotReplyService {
         input.messageType === "location" && input.locationData
           ? `\n\nINBOUND_LOCATION_DATA: ${JSON.stringify(input.locationData)}\nIf FSM_STATE is CHECKOUT_AWAITING_LOCATION, call set_checkout_location immediately using this structured data with isManual=false.\n`
           : "";
+      const syntheticToolHint =
+        syntheticTools.length > 0
+          ? `\n\nSYNTHETIC_TOOL_RESULTS_THIS_TURN: ${JSON.stringify(syntheticTools.map((entry) => ({
+              tool: entry.toolName,
+              args: entry.toolArgs,
+              result: entry.toolResult,
+            })))}\nIf the required selection tool result is already present above, use it directly and do not call the same tool again in this turn.\n`
+          : "";
       const messages = [
         { role: "system" as const, content: dynamicSystemContent },
         ...history.map((t) => ({
           role: t.role,
           content: t.content,
         })),
+        ...(syntheticToolHint
+          ? [{ role: "system" as const, content: syntheticToolHint }]
+          : []),
         ...(locationHint ? [{ role: "system" as const, content: locationHint }] : []),
       ];
 
-      const conversationId = input.conversationId;
       const runToolTrace: Array<{
         name: string;
         arguments: string;
         result: string;
       }> = [];
+      for (const entry of syntheticTools) {
+        const argsPreview =
+          entry.toolArgs.length > 700
+            ? `${entry.toolArgs.slice(0, 700)}...`
+            : entry.toolArgs;
+        const resultPreview =
+          entry.toolResult.length > 700
+            ? `${entry.toolResult.slice(0, 700)}...`
+            : entry.toolResult;
+        console.info(
+          `[bot-reply][tool][${conversationId}] ${entry.toolName} args=${argsPreview} result=${resultPreview}`,
+        );
+        runToolTrace.push({
+          name: entry.toolName,
+          arguments: entry.toolArgs,
+          result: entry.toolResult,
+        });
+      }
+      let finalText = "";
 
       await this.openAIService.runChatWithTools(messages, {
         tools: LADIES_FASHION_WHATSAPP_TOOLS,
@@ -227,27 +630,6 @@ export class BotReplyService implements IBotReplyService {
             });
           }
 
-          const catalogErr = (e: unknown) => {
-            if (e instanceof DbNotReadyError) {
-              return JSON.stringify({
-                ok: false,
-                error: "database_unavailable",
-              });
-            }
-            if (e instanceof NotFoundError) {
-              return JSON.stringify({ ok: false, error: "not_found" });
-            }
-            if (e instanceof BadRequestError) {
-              return JSON.stringify({
-                ok: false,
-                error: "bad_request",
-                message: e.message,
-              });
-            }
-            const m = e instanceof Error ? e.message : String(e);
-            return JSON.stringify({ ok: false, error: m });
-          };
-
           /* -------------------------------------------------------- */
           /*  browse_categories                                       */
           /* -------------------------------------------------------- */
@@ -296,7 +678,7 @@ export class BotReplyService implements IBotReplyService {
                 JSON.stringify({ ok: true, categories: forLLM }),
               );
             } catch (e: unknown) {
-              return pushResult(name, argsJson, catalogErr(e));
+              return pushResult(name, argsJson, this.mapCatalogError(e));
             }
           }
 
@@ -365,7 +747,7 @@ export class BotReplyService implements IBotReplyService {
                 }),
               );
             } catch (e: unknown) {
-              return pushResult(name, argsJson, catalogErr(e));
+              return pushResult(name, argsJson, this.mapCatalogError(e));
             }
           }
 
@@ -385,92 +767,11 @@ export class BotReplyService implements IBotReplyService {
                 }),
               );
             }
-            const { productNumber } = checked.data;
-            try {
-              const session = await this.botSessionRepo.getOrCreate(
-                conversationId,
-              );
-              const prod = session.products.find(
-                (p) => p.n === productNumber,
-              );
-              if (!prod) {
-                return pushResult(
-                  name,
-                  argsJson,
-                  JSON.stringify({
-                    ok: false,
-                    error: "invalid_product_number",
-                    message: `No product with number ${productNumber}. Available: ${session.products.map((p) => `${p.n}=${p.name}`).join(", ") || "none (call browse_products first)"}`,
-                  }),
-                );
-              }
-              const detail = await this.catalogService.getProductDetail(
-                prod.id,
-              );
-              const numberedColors = detail.colors
-                .filter((c) => c.active)
-                .map((c, i) => ({
-                  n: i + 1,
-                  id: c.id,
-                  name: c.colorName || c.colorNameEn || `Color ${i + 1}`,
-                  imageUrl: c.imageUrl,
-                }));
-              const snapshot = {
-                productId: detail.product.id,
-                productName: detail.product.name,
-                description: detail.product.description,
-                fabric: detail.product.fabric,
-                occasions: detail.product.occasions,
-                basePrice: detail.product.basePrice,
-                currency: detail.product.currency,
-                sizes: detail.product.allowedSizes,
-                colors: numberedColors,
-              };
-              await this.botSessionRepo.setProductDetail(
-                conversationId,
-                snapshot,
-              );
-
-              const colorsForLLM = numberedColors.map((c) => ({
-                n: c.n,
-                name: c.name,
-              }));
-
-              const stockSummary: Record<
-                string,
-                Array<{ size: string; available: boolean; price: number | null }>
-              > = {};
-              for (const color of detail.colors.filter((c) => c.active)) {
-                const cNum = numberedColors.find((nc) => nc.id === color.id);
-                if (!cNum) continue;
-                stockSummary[`color_${cNum.n}`] = color.stock
-                  .filter((s) => s.active)
-                  .map((s) => ({
-                    size: s.size,
-                    available: s.isAvailable,
-                    price: s.price,
-                  }));
-              }
-
-              return pushResult(
-                name,
-                argsJson,
-                JSON.stringify({
-                  ok: true,
-                  product: detail.product.name,
-                  description: detail.product.description,
-                  fabric: detail.product.fabric,
-                  occasions: detail.product.occasions,
-                  basePrice: detail.product.basePrice,
-                  currency: detail.product.currency,
-                  sizes: detail.product.allowedSizes,
-                  colors: colorsForLLM,
-                  stockByColor: stockSummary,
-                }),
-              );
-            } catch (e: unknown) {
-              return pushResult(name, argsJson, catalogErr(e));
-            }
+            const toolResult = await this.handleSelectProduct(
+              checked.data.productNumber,
+              conversationId,
+            );
+            return pushResult(name, argsJson, toolResult);
           }
 
           /* -------------------------------------------------------- */
@@ -489,51 +790,11 @@ export class BotReplyService implements IBotReplyService {
                 }),
               );
             }
-            const { size } = checked.data;
-            try {
-              const session = await this.botSessionRepo.getOrCreate(
-                conversationId,
-              );
-              if (!session.productDetail) {
-                return pushResult(
-                  name,
-                  argsJson,
-                  JSON.stringify({
-                    ok: false,
-                    error: "no_product_selected",
-                    message:
-                      "Call select_product first before selecting a size.",
-                  }),
-                );
-              }
-              const validSizes = session.productDetail.sizes;
-              const match = validSizes.find(
-                (s) => s.toLowerCase() === size.toLowerCase(),
-              );
-              if (!match) {
-                return pushResult(
-                  name,
-                  argsJson,
-                  JSON.stringify({
-                    ok: false,
-                    error: "invalid_size",
-                    message: `"${size}" is not available. Valid sizes: ${validSizes.join(", ")}`,
-                  }),
-                );
-              }
-              await this.botSessionRepo.setSize(conversationId, match);
-              return pushResult(
-                name,
-                argsJson,
-                JSON.stringify({
-                  ok: true,
-                  size: match,
-                  product: session.productDetail.productName,
-                }),
-              );
-            } catch (e: unknown) {
-              return pushResult(name, argsJson, catalogErr(e));
-            }
+            const toolResult = await this.handleSelectSize(
+              checked.data.size,
+              conversationId,
+            );
+            return pushResult(name, argsJson, toolResult);
           }
 
           /* -------------------------------------------------------- */
@@ -552,51 +813,11 @@ export class BotReplyService implements IBotReplyService {
                 }),
               );
             }
-            const { colorNumber } = checked.data;
-            try {
-              const session = await this.botSessionRepo.getOrCreate(
-                conversationId,
-              );
-              if (!session.productDetail) {
-                return pushResult(
-                  name,
-                  argsJson,
-                  JSON.stringify({
-                    ok: false,
-                    error: "no_product_selected",
-                    message:
-                      "Call select_product first before selecting a colour.",
-                  }),
-                );
-              }
-              const color = session.productDetail.colors.find(
-                (c) => c.n === colorNumber,
-              );
-              if (!color) {
-                return pushResult(
-                  name,
-                  argsJson,
-                  JSON.stringify({
-                    ok: false,
-                    error: "invalid_color_number",
-                    message: `No colour with number ${colorNumber}. Available: ${session.productDetail.colors.map((c) => `${c.n}=${c.name}`).join(", ")}`,
-                  }),
-                );
-              }
-              await this.botSessionRepo.setColor(conversationId, colorNumber);
-              return pushResult(
-                name,
-                argsJson,
-                JSON.stringify({
-                  ok: true,
-                  colorNumber,
-                  colorName: color.name,
-                  product: session.productDetail.productName,
-                }),
-              );
-            } catch (e: unknown) {
-              return pushResult(name, argsJson, catalogErr(e));
-            }
+            const toolResult = await this.handleSelectColor(
+              checked.data.colorNumber,
+              conversationId,
+            );
+            return pushResult(name, argsJson, toolResult);
           }
 
           /* -------------------------------------------------------- */
@@ -615,67 +836,11 @@ export class BotReplyService implements IBotReplyService {
                 }),
               );
             }
-            try {
-              const session = await this.botSessionRepo.getOrCreate(
-                conversationId,
-              );
-              const resolved = this.botSessionRepo.resolveColor(
-                session,
-                checked.data.colorNumber,
-              );
-              if (!resolved) {
-                return pushResult(
-                  name,
-                  argsJson,
-                  JSON.stringify({
-                    ok: false,
-                    error: "no_product_or_color",
-                    message:
-                      "No product selected or no colour available. Call select_product (and optionally select_color) first.",
-                  }),
-                );
-              }
-              const { productId, colorId, imageUrl } = resolved;
-              if (!imageUrl) {
-                return pushResult(
-                  name,
-                  argsJson,
-                  JSON.stringify({
-                    ok: false,
-                    error: "missing_image_url",
-                  }),
-                );
-              }
-              const mediaRef = `${productId}:${colorId}`;
-              try {
-                const sent = await this.whatsAppService.sendImageByLink({
-                  conversationId,
-                  imageUrl,
-                  mediaRef,
-                  senderRole: "bot",
-                  toolTrace: [...runToolTrace],
-                });
-                await this.botSessionRepo.markImageSent(conversationId);
-                return pushResult(
-                  name,
-                  argsJson,
-                  JSON.stringify({
-                    ok: true,
-                    sent: true,
-                    waMessageId: sent.waMessageId,
-                  }),
-                );
-              } catch (e: unknown) {
-                const m = e instanceof Error ? e.message : String(e);
-                return pushResult(
-                  name,
-                  argsJson,
-                  JSON.stringify({ ok: false, error: m }),
-                );
-              }
-            } catch (e: unknown) {
-              return pushResult(name, argsJson, catalogErr(e));
-            }
+            const toolResult = await this.handleSendProductImage(
+              conversationId,
+              runToolTrace,
+            );
+            return pushResult(name, argsJson, toolResult);
           }
 
           /* -------------------------------------------------------- */
@@ -694,44 +859,11 @@ export class BotReplyService implements IBotReplyService {
                 }),
               );
             }
-            const cartItem = await this.botSessionRepo.addToCart(
-              conversationId,
+            const toolResult = await this.handleAddToCart(
               checked.data.quantity,
+              conversationId,
             );
-            if (!cartItem) {
-              return pushResult(
-                name,
-                argsJson,
-                JSON.stringify({
-                  ok: false,
-                  error: "no_active_selection",
-                  instruction:
-                    "Active selection is incomplete. Ensure product, size, and color are selected before adding to cart.",
-                }),
-              );
-            }
-            const session = await this.botSessionRepo.getOrCreate(conversationId);
-            const cartTotal = session.cart.reduce(
-              (sum, i) => sum + i.unitPrice * i.quantity,
-              0,
-            );
-            return pushResult(
-              name,
-              argsJson,
-              JSON.stringify({
-                ok: true,
-                addedItem: {
-                  productName: cartItem.productName,
-                  size: cartItem.size,
-                  colorName: cartItem.colorName,
-                  unitPrice: cartItem.unitPrice,
-                  quantity: cartItem.quantity,
-                  lineTotal: cartItem.unitPrice * cartItem.quantity,
-                },
-                cartItemCount: session.cart.length,
-                cartSubtotal: cartTotal,
-              }),
-            );
+            return pushResult(name, argsJson, toolResult);
           }
 
           /* -------------------------------------------------------- */
@@ -1020,11 +1152,22 @@ export class BotReplyService implements IBotReplyService {
                 productName: item.productName,
                 colorName: item.colorName,
               }));
+              const confirmedItems = session.cart.map((item) => ({
+                n: item.n,
+                productName: item.productName,
+                size: item.size,
+                colorName: item.colorName,
+                unitPrice: item.unitPrice,
+                quantity: item.quantity,
+                lineTotal: item.unitPrice * item.quantity,
+              }));
+              const deliveryLocation = session.checkoutLocation.raw;
+              const phone = session.checkoutPhone;
               const saved = await this.shopOrderService.createFromBotTool(
                 conversationId,
                 {
-                  customerOrderPhone: session.checkoutPhone,
-                  deliveryLocation: session.checkoutLocation.raw,
+                  customerOrderPhone: phone,
+                  deliveryLocation,
                   deliveryLocationLat: session.checkoutLocation.lat,
                   deliveryLocationLng: session.checkoutLocation.lng,
                   locationVerified: !session.checkoutLocation.isManual,
@@ -1036,10 +1179,20 @@ export class BotReplyService implements IBotReplyService {
               return pushResult(
                 name,
                 argsJson,
-                JSON.stringify({ ok: true, ...saved }),
+                JSON.stringify({
+                  ok: true,
+                  orderReference: saved.orderReference,
+                  itemsSubtotal: saved.itemsSubtotal,
+                  deliveryCharge: saved.deliveryCharge,
+                  grandTotal: saved.grandTotal,
+                  currency: saved.currency,
+                  confirmedItems,
+                  deliveryLocation,
+                  phone,
+                }),
               );
             } catch (e: unknown) {
-              return pushResult(name, argsJson, catalogErr(e));
+              return pushResult(name, argsJson, this.mapCatalogError(e));
             }
           }
 
@@ -1067,7 +1220,7 @@ export class BotReplyService implements IBotReplyService {
                 );
               return pushResult(name, argsJson, JSON.stringify(status));
             } catch (e: unknown) {
-              return pushResult(name, argsJson, catalogErr(e));
+              return pushResult(name, argsJson, this.mapCatalogError(e));
             }
           }
 
@@ -1125,13 +1278,53 @@ export class BotReplyService implements IBotReplyService {
         onContentFallback: async (text) => {
           const cleaned = sanitizeWhatsAppText(text);
           if (!cleaned) return;
+          finalText = cleaned;
+        },
+      });
+
+      if (!finalText) return;
+      const sessionAfter = await this.botSessionRepo.getOrCreate(conversationId);
+      const fsmStateAfter = deriveFsmState(sessionAfter);
+      const syntheticToolNames = new Set(
+        syntheticTools.map((t) => t.toolName),
+      );
+      const hadValidDeterministicProgress =
+        syntheticToolNames.has("select_product") ||
+        syntheticToolNames.has("select_size") ||
+        syntheticToolNames.has("select_color") ||
+        syntheticToolNames.has("send_product_image") ||
+        syntheticToolNames.has("add_to_cart");
+
+      if (!hadValidDeterministicProgress) {
+        const responseImpliesProductSelected =
+          fsmStateBefore === "PRODUCT_NOT_SELECTED" &&
+          fsmStateAfter === "PRODUCT_NOT_SELECTED" &&
+          sessionAfter.productDetail === null &&
+          /you.{0,10}selected|choose a size|available sizes|here are the.{0,20}sizes/i.test(
+            finalText ?? "",
+          );
+
+        if (responseImpliesProductSelected) {
+          console.warn(
+            `[bot-reply][validation] Suppressing hallucinated response — model implied select_product without tool call. conversationId=${conversationId}`,
+          );
+          const safeText =
+            "Sorry, something went wrong. Please reply with the product number to continue.";
           await this.whatsAppService.sendTextMessage({
             conversationId,
-            text: cleaned,
+            text: safeText,
             senderRole: "bot",
             toolTrace: runToolTrace.length ? [...runToolTrace] : undefined,
           });
-        },
+          return;
+        }
+      }
+
+      await this.whatsAppService.sendTextMessage({
+        conversationId,
+        text: finalText,
+        senderRole: "bot",
+        toolTrace: runToolTrace.length ? [...runToolTrace] : undefined,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

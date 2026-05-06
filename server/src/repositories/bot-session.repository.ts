@@ -232,6 +232,7 @@ export class BotSessionRepository {
           selectedSize: null,
           selectedColorN: null,
           imageSent: false,
+          sessionStartedAt: new Date(),
         },
       },
     );
