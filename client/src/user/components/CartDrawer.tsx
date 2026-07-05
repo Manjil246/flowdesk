@@ -1,5 +1,5 @@
 import { X, Minus, Plus, Trash2 } from 'lucide-react';
-import { useCartStore } from '@/user/stores/cartStore';
+import { useCartStore, formatShippingAmount } from '@/user/stores/cartStore';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -75,7 +75,7 @@ export default function CartDrawer() {
                   </div>
                   <div className="flex justify-between font-body text-sm">
                     <span className="text-muted-foreground">Shipping</span>
-                    <span className="text-foreground">रू {getShipping()}</span>
+                    <span className="text-foreground">{formatShippingAmount(getShipping())}</span>
                   </div>
                   <div className="flex justify-between font-body text-base font-semibold pt-2 border-t border-border">
                     <span>Total</span>

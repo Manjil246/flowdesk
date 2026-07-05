@@ -10,7 +10,20 @@ export const ORDER_STATUS_VALUES: OrderStatus[] = [
 ];
 
 export function orderStatusLabel(status: OrderStatus): string {
-  return status.replace(/_/g, " ");
+  switch (status) {
+    case "order_placed":
+      return "Pending review";
+    case "payment_confirmed":
+      return "Approved";
+    case "dispatched":
+      return "Shipped";
+    case "delivered":
+      return "Delivered";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return status.replace(/_/g, " ");
+  }
 }
 
 const MAIN_FLOW: OrderStatus[] = [

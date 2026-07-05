@@ -6,15 +6,17 @@ import {
   ArrowLeft,
   ArrowRight,
   Ban,
+  ExternalLink,
   Loader2,
+  Mail,
   MapPin,
   Package,
   Phone,
-  RotateCcw,
   Undo2,
+  User,
 } from "lucide-react";
 import { toast } from "sonner";
-import { fetchOrder, patchOrder, type OrderStatus } from "@/lib/api/orders";
+import { fetchOrder, patchOrder, type OrderDto, type OrderStatus } from "@/lib/api/orders";
 import {
   getAllowedNextStatuses,
   getStatusActionKind,
@@ -29,11 +31,48 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+const STATUS_FLOW: OrderStatus[] = [
+  "order_placed",
+  "payment_confirmed",
+  "dispatched",
+  "delivered",
+];
+
+function statusStepIndex(status: OrderStatus): number {
+  if (status === "cancelled") return -1;
+  const i = STATUS_FLOW.indexOf(status);
+  return i >= 0 ? i : 0;
+}
+
+function hasStructuredDelivery(order: OrderDto): boolean {
+  return Boolean(
+    order.deliveryStreet?.trim() ||
+      order.deliveryCity?.trim() ||
+      order.deliveryDistrict?.trim() ||
+      order.deliveryProvince?.trim(),
+  );
+}
+
+function DeliveryField({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | null;
+}) {
+  if (!value?.trim()) return null;
+  return (
+    <div>
+      <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
+      <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{value}</p>
+    </div>
+  );
+}
+
 export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const qc = useQueryClient();
 
-  const [editStatus, setEditStatus] = useState<OrderStatus>("order_placed");
   const [tagsInput, setTagsInput] = useState("");
   const [tracking, setTracking] = useState("");
   const [dispatchNotes, setDispatchNotes] = useState("");
@@ -52,7 +91,6 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     if (!order) return;
-    setEditStatus(order.status);
     setTagsInput((order.tags ?? []).join(", "));
     setTracking(order.trackingReference ?? "");
     setDispatchNotes(order.dispatchNotes ?? "");
@@ -60,19 +98,34 @@ export default function OrderDetailPage() {
     setAdminNotes(order.adminNotes ?? "");
   }, [order]);
 
-  const patchMutation = useMutation({
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: ["orders"] });
+    void qc.invalidateQueries({ queryKey: ["order", orderId] });
+  };
+
+  const statusMutation = useMutation({
+    mutationFn: async (target: OrderStatus) => {
+      if (!order?._id) return;
+      if (!isAllowedStatusChange(order.status, target)) {
+        throw new Error("That status change is not allowed from the current state.");
+      }
+      await patchOrder(order._id, { status: target });
+    },
+    onSuccess: (_data, target) => {
+      toast.success(`Order marked as ${orderStatusLabel(target)}`);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const notesMutation = useMutation({
     mutationFn: async () => {
       if (!order?._id) return;
       const tags = tagsInput
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean);
-      const statusChanged = editStatus !== order.status;
-      if (statusChanged && !isAllowedStatusChange(order.status, editStatus)) {
-        throw new Error("That status change is not allowed from the current state.");
-      }
       await patchOrder(order._id, {
-        ...(statusChanged ? { status: editStatus } : {}),
         tags,
         trackingReference: tracking.trim() || null,
         dispatchNotes: dispatchNotes.trim() || null,
@@ -81,15 +134,19 @@ export default function OrderDetailPage() {
       });
     },
     onSuccess: () => {
-      toast.success("Order updated");
-      void qc.invalidateQueries({ queryKey: ["orders"] });
-      void qc.invalidateQueries({ queryKey: ["order", orderId] });
+      toast.success("Notes saved");
+      invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const allowedTargets = useMemo(
     () => (order ? getAllowedNextStatuses(order.status) : []),
+    [order],
+  );
+
+  const totalPieces = useMemo(
+    () => order?.lineItems.reduce((sum, li) => sum + li.quantity, 0) ?? 0,
     [order],
   );
 
@@ -102,316 +159,348 @@ export default function OrderDetailPage() {
   }
 
   return (
-    <div className="p-6 pb-24 md:pb-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-3 min-w-0">
-          <Button variant="ghost" size="sm" className="-ml-2 h-8 text-muted-foreground" asChild>
-            <Link to="/admin/orders" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to orders
-            </Link>
-          </Button>
-          {isLoading && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-sm">Loading order…</span>
-            </div>
-          )}
-          {error && !isLoading && (
-            <p className="text-sm text-destructive">{(error as Error).message}</p>
-          )}
-          {order && !isLoading && (
-            <>
-              <div className="flex flex-wrap items-center gap-2 gap-y-2">
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground font-mono">
-                  {order.orderReference ?? "—"}
-                </h1>
-                <Badge variant="secondary" className="capitalize shrink-0">
-                  {orderStatusLabel(order.status)}
-                </Badge>
-                {editStatus !== order.status ? (
-                  <Badge variant="outline" className="capitalize shrink-0 border-primary/40 text-primary">
-                    Pending: {orderStatusLabel(editStatus)}
-                  </Badge>
-                ) : null}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {order.createdAt
-                  ? `Placed ${format(new Date(order.createdAt), "MMM d, yyyy 'at' HH:mm")}`
-                  : "Order"}
-                {" · "}
-                <span className="font-mono text-xs break-all">{order._id}</span>
-              </p>
-            </>
-          )}
-        </div>
-        {order && !isLoading && (
-          <div className="flex shrink-0 gap-2 sm:pt-8">
-            <Button
-              onClick={() => patchMutation.mutate()}
-              disabled={patchMutation.isPending}
-              className="min-w-[132px] shadow-sm"
-            >
-              {patchMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : null}
-              Save changes
-            </Button>
+    <div className="mx-auto max-w-6xl space-y-6 pb-24 md:pb-6">
+      <div className="flex flex-col gap-4">
+        <Button variant="ghost" size="sm" className="-ml-2 h-8 w-fit text-muted-foreground" asChild>
+          <Link to="/admin/orders" className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to orders
+          </Link>
+        </Button>
+
+        {isLoading && (
+          <div className="flex items-center gap-2 text-muted-foreground py-12 justify-center">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span className="text-sm">Loading order…</span>
           </div>
         )}
-      </div>
 
-      {order && !isLoading && (
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
-            <Card className="overflow-hidden border-border/80 shadow-sm">
-              <CardHeader className="border-b border-border/60 bg-muted/30 pb-4">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                  Line items
-                </CardTitle>
-                <CardDescription>Products, variants, and totals</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-4 space-y-4">
-                <ul className="space-y-3">
-                  {order.lineItems.map((li, i) => (
-                    <li
-                      key={i}
-                      className="rounded-lg border border-border/80 bg-card px-3 py-3 text-sm leading-relaxed"
+        {error && !isLoading && (
+          <p className="text-sm text-destructive py-8 text-center">{(error as Error).message}</p>
+        )}
+
+        {order && !isLoading && (
+          <>
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+              <div className="space-y-2 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="admin-display-title text-2xl tracking-tight font-mono">
+                    {order.orderReference}
+                  </h1>
+                  <Badge variant="secondary" className="shrink-0">
+                    {orderStatusLabel(order.status)}
+                  </Badge>
+                  {order.source === "web" ? (
+                    <Badge variant="outline" className="shrink-0">Website</Badge>
+                  ) : order.source === "admin" ? (
+                    <Badge variant="outline" className="shrink-0">Manual</Badge>
+                  ) : order.source === "whatsapp" ? (
+                    <Badge variant="outline" className="shrink-0">WhatsApp</Badge>
+                  ) : null}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Placed {order.createdAt ? format(new Date(order.createdAt), "MMM d, yyyy 'at' HH:mm") : "—"}
+                  {" · "}
+                  {totalPieces} {totalPieces === 1 ? "piece" : "pieces"}
+                  {" · "}
+                  {order.lineItems.length} {order.lineItems.length === 1 ? "item" : "items"}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm shrink-0">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Grand total</p>
+                <p className="text-xl font-semibold tabular-nums">
+                  {order.currency} {order.grandTotal.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {order.status !== "cancelled" && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {STATUS_FLOW.map((step, i) => {
+                  const current = statusStepIndex(order.status);
+                  const done = i < current;
+                  const active = i === current;
+                  return (
+                    <div
+                      key={step}
+                      className={cn(
+                        "rounded-lg border px-3 py-2.5 text-center text-xs",
+                        done && "border-accent-foreground/30 bg-secondary text-accent-foreground",
+                        active && "border-foreground bg-foreground/10 text-foreground font-medium",
+                        !done && !active && "border-border bg-background text-muted-foreground",
+                      )}
                     >
-                      <div className="font-medium text-foreground">{li.productName}</div>
-                      <div className="text-muted-foreground text-xs mt-1">
-                        {li.colorName} · size {li.size} × {li.quantity}
-                      </div>
-                      <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs tabular-nums">
-                        <span className="text-muted-foreground">
-                          {order.currency} {li.unitPrice.toLocaleString()} each
-                        </span>
-                        <span className="font-medium text-foreground">
-                          {order.currency} {li.lineTotal.toLocaleString()}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                <div className="rounded-lg bg-muted/40 px-3 py-3 text-sm space-y-1 tabular-nums">
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Subtotal</span>
-                    <span>
-                      {order.currency} {order.itemsSubtotal.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Delivery</span>
-                    <span>
-                      {order.currency} {order.deliveryCharge.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between font-semibold text-foreground pt-1 border-t border-border/60 mt-1">
-                    <span>Grand total</span>
-                    <span>
-                      {order.currency} {order.grandTotal.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/80 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Fulfillment & notes</CardTitle>
-                <CardDescription>Tracking, dispatch, payment, and internal notes</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="tags">Tags</Label>
-                  <Input
-                    id="tags"
-                    className="mt-1.5"
-                    value={tagsInput}
-                    onChange={(e) => setTagsInput(e.target.value)}
-                    placeholder="priority, cod, …"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Comma-separated</p>
-                </div>
-                <div>
-                  <Label htmlFor="tracking">Tracking reference</Label>
-                  <Input
-                    id="tracking"
-                    className="mt-1.5"
-                    value={tracking}
-                    onChange={(e) => setTracking(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="dispatch">Dispatch notes</Label>
-                  <Textarea
-                    id="dispatch"
-                    className="mt-1.5 min-h-[88px]"
-                    value={dispatchNotes}
-                    onChange={(e) => setDispatchNotes(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="payment">Payment notes</Label>
-                  <Textarea
-                    id="payment"
-                    className="mt-1.5 min-h-[88px]"
-                    value={paymentNotes}
-                    onChange={(e) => setPaymentNotes(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="admin">Admin notes</Label>
-                  <Textarea
-                    id="admin"
-                    className="mt-1.5 min-h-[88px]"
-                    value={adminNotes}
-                    onChange={(e) => setAdminNotes(e.target.value)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <Card className="border-border/80 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Customer</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <div className="flex gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Phone className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Order phone</p>
-                    <p className="font-medium">{order.customerOrderPhone}</p>
-                    <p className="text-xs text-muted-foreground mt-2">WhatsApp</p>
-                    <p className="font-mono text-xs break-all">{order.customerWaPhone}</p>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">Delivery</p>
-                    <p className="whitespace-pre-wrap mt-0.5">{order.deliveryLocation}</p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Location verified:{" "}
-                      <span className="text-foreground font-medium">
-                        {order.locationVerified ? "Yes" : "No"}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Conversation</p>
-                  <p className="font-mono text-xs break-all mt-1">{order.conversationId}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/80 shadow-md ring-1 ring-border/40 overflow-hidden">
-              <CardHeader className="border-b border-border/60 bg-gradient-to-br from-muted/50 via-muted/20 to-background pb-4">
-                <CardTitle className="text-base">Status</CardTitle>
-                <CardDescription>
-                  One step forward, one step back, or cancel until delivered. Skips are blocked on the
-                  server.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-5">
-                {order.status === "delivered" || order.status === "cancelled" ? (
-                  <p className="text-sm text-muted-foreground">
-                    This order is terminal — status cannot be changed.
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      {allowedTargets.map((target) => {
-                        const kind = getStatusActionKind(order.status, target);
-                        const selected = editStatus === target;
-                        const label =
-                          kind === "cancel"
-                            ? "Cancel order"
-                            : `Set to ${orderStatusLabel(target)}`;
-                        const Icon =
-                          kind === "cancel" ? Ban : kind === "backward" ? Undo2 : ArrowRight;
-                        return (
-                          <Button
-                            key={target}
-                            type="button"
-                            variant={kind === "cancel" ? "destructive" : kind === "backward" ? "outline" : "default"}
-                            disabled={selected}
-                            onClick={() => setEditStatus(target)}
-                            className={cn(
-                              "min-h-11 px-4 justify-start text-left font-medium transition-all",
-                              kind === "forward" &&
-                                "bg-primary text-primary-foreground shadow-md hover:shadow-lg hover:bg-primary/92 ring-0 ring-offset-0 border-0",
-                              kind === "backward" &&
-                                "border-2 border-dashed border-muted-foreground/35 bg-background hover:bg-muted/60 hover:border-muted-foreground/50",
-                              kind === "cancel" &&
-                                "shadow-md hover:shadow-lg border border-destructive/20",
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                "flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
-                                kind === "forward" && "bg-primary-foreground/15",
-                                kind === "backward" && "bg-muted",
-                                kind === "cancel" && "bg-destructive-foreground/15",
-                              )}
-                            >
-                              <Icon className="h-4 w-4" />
-                            </span>
-                            <span className="flex flex-col items-start gap-0.5">
-                              <span className="leading-tight">{label}</span>
-                              <span className="text-[11px] font-normal opacity-80 capitalize">
-                                {orderStatusLabel(target)}
-                              </span>
-                            </span>
-                          </Button>
-                        );
-                      })}
+                      {orderStatusLabel(step)}
                     </div>
-                    {editStatus !== order.status ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="gap-2 text-muted-foreground hover:text-foreground"
-                        onClick={() => setEditStatus(order.status)}
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                        Reset pending status
-                      </Button>
-                    ) : null}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
+                  );
+                })}
+              </div>
+            )}
 
-      {order && !isLoading && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-background/95 backdrop-blur-md p-3 md:hidden flex justify-end gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/admin/orders">List</Link>
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => patchMutation.mutate()}
-            disabled={patchMutation.isPending}
-            className="min-w-[120px]"
-          >
-            {patchMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Save
-          </Button>
-        </div>
-      )}
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2 space-y-6">
+                <Card className="overflow-hidden border-border/80 shadow-sm">
+                  <CardHeader className="border-b border-border/60 bg-muted/30 pb-4">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                      Ordered items
+                    </CardTitle>
+                    <CardDescription>
+                      {order.lineItems.length} products · {totalPieces} total pieces
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <ul className="divide-y divide-border">
+                      {order.lineItems.map((li, i) => (
+                        <li key={`${li.productId}-${li.colorId}-${li.size}-${i}`} className="flex gap-4 p-4">
+                          <div className="relative shrink-0">
+                            {li.imageUrl ? (
+                              <img
+                                src={li.imageUrl}
+                                alt={li.productName}
+                                className="h-24 w-20 rounded-md object-cover border border-border bg-muted"
+                              />
+                            ) : (
+                              <div className="h-24 w-20 rounded-md border border-border bg-muted flex items-center justify-center">
+                                <Package className="h-6 w-6 text-muted-foreground" />
+                              </div>
+                            )}
+                            <span className="absolute -top-2 -right-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+                              ×{li.quantity}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <p className="font-medium text-foreground leading-snug">{li.productName}</p>
+                            <div className="flex flex-wrap gap-2 text-xs">
+                              <Badge variant="outline">{li.colorName}</Badge>
+                              <Badge variant="outline">Size {li.size}</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground pt-1">
+                              {order.currency} {li.unitPrice.toLocaleString()} each
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-semibold tabular-nums">
+                              {order.currency} {li.lineTotal.toLocaleString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {li.quantity} {li.quantity === 1 ? "pc" : "pcs"}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="border-t border-border bg-muted/20 px-4 py-4 space-y-2 text-sm tabular-nums">
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Subtotal</span>
+                        <span>{order.currency} {order.itemsSubtotal.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Delivery</span>
+                        <span>
+                          {order.deliveryCharge === 0
+                            ? "Free"
+                            : `${order.currency} ${order.deliveryCharge.toLocaleString()}`}
+                        </span>
+                      </div>
+                      <div className="flex justify-between font-semibold text-foreground pt-2 border-t border-border/60">
+                        <span>Grand total</span>
+                        <span>{order.currency} {order.grandTotal.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/80 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Fulfillment & notes</CardTitle>
+                    <CardDescription>Tracking, dispatch, payment, and internal notes</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label htmlFor="tags">Tags</Label>
+                      <Input id="tags" className="mt-1.5" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder="priority, cod, …" />
+                    </div>
+                    <div>
+                      <Label htmlFor="tracking">Tracking reference</Label>
+                      <Input id="tracking" className="mt-1.5" value={tracking} onChange={(e) => setTracking(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="dispatch">Dispatch notes</Label>
+                      <Textarea id="dispatch" className="mt-1.5 min-h-[88px]" value={dispatchNotes} onChange={(e) => setDispatchNotes(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="payment">Payment notes</Label>
+                      <Textarea id="payment" className="mt-1.5 min-h-[88px]" value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="admin">Admin notes</Label>
+                      <Textarea id="admin" className="mt-1.5 min-h-[88px]" value={adminNotes} onChange={(e) => setAdminNotes(e.target.value)} />
+                    </div>
+                    <Button
+                      onClick={() => notesMutation.mutate()}
+                      disabled={notesMutation.isPending}
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                    >
+                      {notesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Save notes
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="space-y-6">
+                <Card className="border-border/80 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Customer
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4 text-sm">
+                    {order.customerName ? (
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">Name</p>
+                        <p className="font-medium mt-0.5">{order.customerName}</p>
+                      </div>
+                    ) : null}
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Phone</p>
+                        <a href={`tel:${order.customerOrderPhone}`} className="font-medium hover:underline">
+                          {order.customerOrderPhone}
+                        </a>
+                      </div>
+                    </div>
+                    {order.customerEmail ? (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs text-muted-foreground">Email</p>
+                          <a href={`mailto:${order.customerEmail}`} className="text-sm break-all hover:underline">
+                            {order.customerEmail}
+                          </a>
+                        </div>
+                      </div>
+                    ) : null}
+                    {order.customerWaPhone ? (
+                      <div>
+                        <p className="text-xs text-muted-foreground">WhatsApp</p>
+                        <p className="font-mono text-xs break-all">{order.customerWaPhone}</p>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/80 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Delivery address
+                    </CardTitle>
+                    <CardDescription>Same fields the customer entered at checkout</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4 text-sm">
+                    {hasStructuredDelivery(order) ? (
+                      <>
+                        <DeliveryField label="Street address *" value={order.deliveryStreet} />
+                        <div className="grid grid-cols-2 gap-4">
+                          <DeliveryField label="Province *" value={order.deliveryProvince} />
+                          <DeliveryField label="City *" value={order.deliveryCity} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <DeliveryField label="District" value={order.deliveryDistrict} />
+                          <DeliveryField label="Zip code" value={order.deliveryZipCode} />
+                        </div>
+                        <DeliveryField
+                          label="Delivery notes"
+                          value={
+                            order.deliveryCustomerNotes ||
+                            (order.source === "web" ? order.dispatchNotes : null)
+                          }
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <DeliveryField label="Street address" value={order.deliveryLocation} />
+                        <DeliveryField label="Zip code" value={order.deliveryZipCode} />
+                      </>
+                    )}
+                    <div className="pt-2 border-t border-border/60 space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Location verified:{" "}
+                        <span className="text-foreground font-medium">
+                          {order.locationVerified ? "Yes" : "No"}
+                        </span>
+                      </p>
+                      {order.deliveryLocationLat != null && order.deliveryLocationLng != null ? (
+                        <a
+                          href={`https://www.google.com/maps?q=${order.deliveryLocationLat},${order.deliveryLocationLng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          View GPS on map
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : null}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/80 shadow-md overflow-hidden">
+                  <CardHeader className="border-b border-border/60 bg-muted/30 pb-4">
+                    <CardTitle className="text-base">Update status</CardTitle>
+                    <CardDescription>
+                      Changes apply immediately when you click a button below.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-5">
+                    {order.status === "delivered" || order.status === "cancelled" ? (
+                      <p className="text-sm text-muted-foreground">
+                        This order is {orderStatusLabel(order.status).toLowerCase()} — status cannot be changed.
+                      </p>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {allowedTargets.map((target) => {
+                          const kind = getStatusActionKind(order.status, target);
+                          const label =
+                            kind === "cancel"
+                              ? "Cancel order"
+                              : `Mark as ${orderStatusLabel(target)}`;
+                          const Icon =
+                            kind === "cancel" ? Ban : kind === "backward" ? Undo2 : ArrowRight;
+                          const isPending =
+                            statusMutation.isPending && statusMutation.variables === target;
+                          return (
+                            <Button
+                              key={target}
+                              type="button"
+                              variant={kind === "cancel" ? "destructive" : kind === "backward" ? "outline" : "default"}
+                              disabled={statusMutation.isPending}
+                              onClick={() => statusMutation.mutate(target)}
+                              className="min-h-11 justify-start gap-3"
+                            >
+                              {isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                              ) : (
+                                <Icon className="h-4 w-4 shrink-0" />
+                              )}
+                              {label}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
-

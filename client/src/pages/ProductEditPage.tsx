@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -8,19 +8,32 @@ import {
   Pencil,
   Plus,
   Trash2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createProductColor,
   deleteProductColor,
   fetchCategories,
+  fetchColorPresets,
   fetchProductDetail,
   replaceVariantStock,
   updateProduct,
   updateProductColor,
+  uploadCatalogImageToCloudinary,
   type ProductColorWithStockDto,
   type VariantStockDto,
+  type ColorPresetDto,
 } from "@/lib/api/catalog";
+import { DEFAULT_SELECTED_SIZES, PRESET_SIZES } from "@/lib/product-sizes";
+import {
+  colorNameMatches,
+  isValidHexCode,
+  normalizeHexCode,
+} from "@/lib/color-utils";
+import { ColorVariantPicker } from "@/components/catalog/ColorVariantPicker";
+import { LockedColorDisplay } from "@/components/catalog/LockedColorDisplay";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +52,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +60,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
+const DEFAULT_DELIVERY_CHARGE = 150;
+const SAVE_REQUIRES_VARIANT_MSG =
+  "Please add at least one color variant to save the product.";
 
 type StockRowDraft = {
   /** Empty → inherit product base price (`null` on save). */
@@ -91,6 +109,11 @@ export default function ProductEditPage() {
     queryFn: () => fetchCategories({ active: "all" }),
   });
 
+  const { data: colorPresets = [] } = useQuery({
+    queryKey: ["colorPresets"],
+    queryFn: fetchColorPresets,
+  });
+
   const detailQuery = useQuery({
     queryKey: ["productDetail", productId],
     queryFn: () => fetchProductDetail(productId!),
@@ -104,9 +127,17 @@ export default function ProductEditPage() {
   const [description, setDescription] = useState("");
   const [fabric, setFabric] = useState("");
   const [occasionsStr, setOccasionsStr] = useState("");
-  const [basePrice, setBasePrice] = useState("");
+  const [mrp, setMrp] = useState("");
+  const [sellingPrice, setSellingPrice] = useState("");
   const [currency, setCurrency] = useState("NPR");
-  const [allowedSizesStr, setAllowedSizesStr] = useState("");
+  const [allowedSizes, setAllowedSizes] = useState<string[]>([
+    ...DEFAULT_SELECTED_SIZES,
+  ]);
+  const [customSize, setCustomSize] = useState("");
+  const [freeDelivery, setFreeDelivery] = useState(false);
+  const [deliveryCharge, setDeliveryCharge] = useState(
+    String(DEFAULT_DELIVERY_CHARGE),
+  );
   const [categoryId, setCategoryId] = useState("");
   const [active, setActive] = useState(true);
   const [sortOrder, setSortOrder] = useState("0");
@@ -117,22 +148,63 @@ export default function ProductEditPage() {
     setDescription(p.description);
     setFabric(p.fabric);
     setOccasionsStr(p.occasions.join(", "));
-    setBasePrice(String(p.basePrice));
+    setMrp(String(p.mrp));
+    setSellingPrice(String(p.sellingPrice));
     setCurrency(p.currency);
-    setAllowedSizesStr(p.allowedSizes.join(", "));
+    setAllowedSizes(
+      p.allowedSizes.length > 0 ? [...p.allowedSizes] : [...DEFAULT_SELECTED_SIZES],
+    );
+    setFreeDelivery(p.freeDelivery);
+    setDeliveryCharge(
+      p.freeDelivery
+        ? String(DEFAULT_DELIVERY_CHARGE)
+        : String(p.deliveryCharge || DEFAULT_DELIVERY_CHARGE),
+    );
     setCategoryId(p.categoryId);
     setActive(p.active);
     setSortOrder(String(p.sortOrder));
   }, [p]);
 
-  const allowedSizes = useMemo(
-    () =>
-      allowedSizesStr
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    [allowedSizesStr],
-  );
+  const togglePresetSize = (sz: string) => {
+    setAllowedSizes((prev) => {
+      if (prev.includes(sz)) {
+        if (prev.length <= 1) {
+          toast.error("Keep at least one size");
+          return prev;
+        }
+        return prev.filter((s) => s !== sz);
+      }
+      const rank = (s: string) => {
+        const i = (PRESET_SIZES as readonly string[]).indexOf(s);
+        return i === -1 ? 100 + s.charCodeAt(0) : i;
+      };
+      return [...prev, sz].sort((a, b) => {
+        const d = rank(a) - rank(b);
+        return d !== 0 ? d : a.localeCompare(b);
+      });
+    });
+  };
+
+  const addCustomSize = () => {
+    const s = customSize.trim();
+    if (!s) return;
+    if (allowedSizes.includes(s)) {
+      toast.message("Size already added");
+      return;
+    }
+    setAllowedSizes((prev) => [...prev, s]);
+    setCustomSize("");
+  };
+
+  const removeSize = (sz: string) => {
+    setAllowedSizes((prev) => {
+      if (prev.length <= 1) {
+        toast.error("Keep at least one size");
+        return prev;
+      }
+      return prev.filter((s) => s !== sz);
+    });
+  };
 
   const [stockOpenId, setStockOpenId] = useState<string | null>(null);
   const [stockDrafts, setStockDrafts] = useState<
@@ -165,21 +237,37 @@ export default function ProductEditPage() {
   const updateProductMutation = useMutation({
     mutationFn: () => {
       if (!productId) throw new Error("Missing product");
-      const price = Number(basePrice);
-      if (Number.isNaN(price) || price < 0) throw new Error("Invalid price");
+      const mrpVal = Number(mrp);
+      const sp = Number(sellingPrice);
+      if (Number.isNaN(mrpVal) || mrpVal < 0) throw new Error("Invalid MRP");
+      if (Number.isNaN(sp) || sp < 0) throw new Error("Invalid selling price");
+      if (sp > mrpVal) throw new Error("Selling price cannot exceed MRP");
       const occasions = occasionsStr
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
+      let deliveryAmount = 0;
+      if (!freeDelivery) {
+        deliveryAmount = Number(deliveryCharge);
+        if (Number.isNaN(deliveryAmount) || deliveryAmount <= 0) {
+          throw new Error(
+            "Enter a delivery charge greater than 0, or select free delivery",
+          );
+        }
+      }
+      if (colors.length === 0) throw new Error(SAVE_REQUIRES_VARIANT_MSG);
       return updateProduct(productId, {
         categoryId,
         name: name.trim(),
         description: description.trim(),
         fabric: fabric.trim(),
         occasions,
-        basePrice: price,
+        mrp: mrpVal,
+        sellingPrice: sp,
         currency: currency.trim() || "NPR",
         allowedSizes,
+        freeDelivery,
+        deliveryCharge: freeDelivery ? 0 : deliveryAmount,
         active,
         sortOrder: Number(sortOrder) || 0,
       });
@@ -194,23 +282,100 @@ export default function ProductEditPage() {
 
   const [colorDialog, setColorDialog] = useState(false);
   const [colorEditingId, setColorEditingId] = useState<string | null>(null);
+  const [variantPresetActive, setVariantPresetActive] = useState(false);
   const [cn, setCn] = useState("");
-  const [cnEn, setCnEn] = useState("");
+  const [cHex, setCHex] = useState("#888888");
   const [cImg, setCImg] = useState("");
   const [cActive, setCActive] = useState(true);
   const [cSort, setCSort] = useState("0");
+  const [uploadingColorId, setUploadingColorId] = useState<string | null>(null);
+
+  const uploadColorImage = async (
+    file: File | null,
+    onUrl: (url: string) => void,
+    uploadKey: string,
+  ) => {
+    if (!file) return;
+    setUploadingColorId(uploadKey);
+    try {
+      const url = await uploadCatalogImageToCloudinary(file);
+      onUrl(url);
+      toast.success("Image uploaded");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setUploadingColorId(null);
+    }
+  };
+
+  const replaceColorImageMutation = useMutation({
+    mutationFn: async ({
+      colorId,
+      file,
+    }: {
+      colorId: string;
+      file: File;
+    }) => {
+      if (!productId) throw new Error("Missing product");
+      setUploadingColorId(colorId);
+      const url = await uploadCatalogImageToCloudinary(file);
+      return updateProductColor(productId, colorId, { imageUrl: url });
+    },
+    onSuccess: () => {
+      toast.success("Image updated");
+      qc.invalidateQueries({ queryKey: ["productDetail", productId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+    onSettled: () => setUploadingColorId(null),
+  });
+
+  const openAddVariantDialog = () => {
+    setColorEditingId(null);
+    setVariantPresetActive(false);
+    setCn("");
+    setCHex("#888888");
+    setCImg("");
+    setCActive(true);
+    setCSort("0");
+    setColorDialog(true);
+  };
+
+  const selectVariantPreset = (preset: ColorPresetDto) => {
+    setVariantPresetActive(true);
+    setCn(preset.name);
+    setCHex(normalizeHexCode(preset.hexCode));
+  };
+
+  const openEditColorDialog = (color: ProductColorWithStockDto) => {
+    setColorEditingId(color.id);
+    setVariantPresetActive(false);
+    setCn(color.colorName);
+    setCHex(color.hexCode || "#888888");
+    setCImg(color.imageUrl);
+    setCActive(color.active);
+    setCSort(String(color.sortOrder));
+    setColorDialog(true);
+  };
 
   const saveColorMutation = useMutation({
     mutationFn: async () => {
       if (!productId) throw new Error("Missing product");
       if (!cn.trim() || !cImg.trim()) {
-        throw new Error("Color name and image URL are required");
+        throw new Error("Color name and image are required");
       }
+      if (!isValidHexCode(cHex)) {
+        throw new Error("Invalid color hex");
+      }
+      if (
+        !colorEditingId &&
+        colors.some((c) => colorNameMatches(c.colorName, cn))
+      ) {
+        throw new Error("This color is already on the product");
+      }
+      const hexCode = normalizeHexCode(cHex);
       const sortOrder = Number(cSort) || 0;
       if (colorEditingId) {
         return updateProductColor(productId, colorEditingId, {
-          colorName: cn.trim(),
-          colorNameEn: cnEn.trim(),
           imageUrl: cImg.trim(),
           active: cActive,
           sortOrder,
@@ -218,7 +383,7 @@ export default function ProductEditPage() {
       }
       return createProductColor(productId, {
         colorName: cn.trim(),
-        colorNameEn: cnEn.trim(),
+        hexCode,
         imageUrl: cImg.trim(),
         active: cActive,
         sortOrder,
@@ -229,8 +394,9 @@ export default function ProductEditPage() {
       qc.invalidateQueries({ queryKey: ["productDetail", productId] });
       setColorDialog(false);
       setColorEditingId(null);
+      setVariantPresetActive(false);
       setCn("");
-      setCnEn("");
+      setCHex("#888888");
       setCImg("");
       setCActive(true);
       setCSort("0");
@@ -307,7 +473,7 @@ export default function ProductEditPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-4xl">
+    <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="outline" size="icon" asChild>
           <Link to="/admin/products">
@@ -315,7 +481,7 @@ export default function ProductEditPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="admin-display-title text-2xl tracking-tight">
             {p?.name ?? "Product"}
           </h1>
           <p className="text-sm text-muted-foreground font-mono">{productId}</p>
@@ -391,14 +557,25 @@ export default function ProductEditPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pe-price">Base price</Label>
+                  <Label htmlFor="pe-mrp">MRP (रू)</Label>
                   <Input
-                    id="pe-price"
+                    id="pe-mrp"
                     type="number"
                     min={0}
                     step="0.01"
-                    value={basePrice}
-                    onChange={(e) => setBasePrice(e.target.value)}
+                    value={mrp}
+                    onChange={(e) => setMrp(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pe-sp">Selling price (रू)</Label>
+                  <Input
+                    id="pe-sp"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={sellingPrice}
+                    onChange={(e) => setSellingPrice(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -409,16 +586,114 @@ export default function ProductEditPage() {
                     onChange={(e) => setCurrency(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="pe-sizes">
-                    Allowed sizes (comma-separated)
-                  </Label>
-                  <Input
-                    id="pe-sizes"
-                    value={allowedSizesStr}
-                    onChange={(e) => setAllowedSizesStr(e.target.value)}
-                    placeholder="S, M, L, XL"
-                  />
+                <div className="space-y-3 sm:col-span-2 rounded-lg border border-border px-4 py-3">
+                  <Label>Delivery</Label>
+                  <RadioGroup
+                    value={freeDelivery ? "free" : "charge"}
+                    onValueChange={(value) => setFreeDelivery(value === "free")}
+                    className="gap-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="free" id="pe-del-free" />
+                      <Label
+                        htmlFor="pe-del-free"
+                        className="font-normal cursor-pointer"
+                      >
+                        Free delivery
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="charge" id="pe-del-charge" />
+                      <Label
+                        htmlFor="pe-del-charge"
+                        className="font-normal cursor-pointer"
+                      >
+                        Delivery charge
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                  {!freeDelivery && (
+                    <div className="space-y-2 max-w-xs">
+                      <Label htmlFor="pe-del-amt">
+                        Amount ({currency.trim() || "NPR"})
+                      </Label>
+                      <Input
+                        id="pe-del-amt"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={deliveryCharge}
+                        onChange={(e) => setDeliveryCharge(e.target.value)}
+                        placeholder={String(DEFAULT_DELIVERY_CHARGE)}
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-3 sm:col-span-2">
+                  <Label>Allowed sizes</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {PRESET_SIZES.map((sz) => (
+                      <Badge
+                        key={sz}
+                        variant={
+                          allowedSizes.includes(sz) ? "default" : "outline"
+                        }
+                        className="cursor-pointer gap-1 pr-1 font-normal"
+                        onClick={() => togglePresetSize(sz)}
+                      >
+                        {sz}
+                        {allowedSizes.includes(sz) && (
+                          <X className="h-3 w-3 opacity-70" aria-hidden />
+                        )}
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                    <div className="space-y-2 flex-1">
+                      <Label htmlFor="pe-csz">Custom size</Label>
+                      <Input
+                        id="pe-csz"
+                        value={customSize}
+                        onChange={(e) => setCustomSize(e.target.value)}
+                        placeholder="e.g. 3XL"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addCustomSize();
+                          }
+                        }}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={addCustomSize}
+                    >
+                      Add size
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <span className="text-sm text-muted-foreground">
+                      Active sizes:
+                    </span>
+                    {allowedSizes.map((sz) => (
+                      <Badge
+                        key={sz}
+                        variant="secondary"
+                        className="gap-1 font-normal"
+                      >
+                        {sz}
+                        <button
+                          type="button"
+                          className="rounded-sm hover:bg-muted-foreground/20 p-0.5"
+                          aria-label={`Remove ${sz}`}
+                          onClick={() => removeSize(sz)}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="pe-sort">Sort order</Label>
@@ -438,9 +713,20 @@ export default function ProductEditPage() {
                   />
                 </div>
               </div>
+              {colors.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {SAVE_REQUIRES_VARIANT_MSG}
+                </p>
+              )}
               <Button
-                onClick={() => updateProductMutation.mutate()}
-                disabled={updateProductMutation.isPending}
+                onClick={() => {
+                  if (colors.length === 0) {
+                    toast.error(SAVE_REQUIRES_VARIANT_MSG);
+                    return;
+                  }
+                  updateProductMutation.mutate();
+                }}
+                disabled={updateProductMutation.isPending || colors.length === 0}
               >
                 {updateProductMutation.isPending && (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -451,18 +737,23 @@ export default function ProductEditPage() {
           </Card>
 
           <Card className="card-shadow border-border/60">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 gap-3">
               <CardTitle className="text-base">Colors &amp; images</CardTitle>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="gap-2 shrink-0"
+                onClick={openAddVariantDialog}
+              >
+                <Plus className="h-4 w-4" />
+                Add color variant
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               {colors.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No colors yet. Add each color with an image URL (e.g. a
-                  Cloudinary{" "}
-                  <code className="text-xs bg-muted px-1 rounded">
-                    https://
-                  </code>{" "}
-                  link).
+                <p className="text-sm text-muted-foreground border border-dashed rounded-lg p-6 text-center">
+                  No variants yet. Click &ldquo;Add color variant&rdquo; to pick a color and upload its image.
                 </p>
               ) : (
                 colors.map((c) => (
@@ -486,40 +777,47 @@ export default function ProductEditPage() {
                             </div>
                           )}
                         </div>
-                        <div className="min-w-0 space-y-1">
-                          <p className="font-medium">{c.colorName}</p>
-                          <p
-                            className="text-xs text-muted-foreground font-mono truncate"
-                            title={c.id}
-                          >
-                            {c.id}
-                          </p>
-                          {c.imageUrl ? (
-                            <a
-                              href={c.imageUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-primary hover:underline inline-block truncate max-w-[min(100%,280px)]"
-                              title={c.imageUrl}
-                            >
-                              Open full size
-                            </a>
-                          ) : null}
+                        <div className="min-w-0 space-y-2">
+                          <LockedColorDisplay
+                            colorName={c.colorName}
+                            hexCode={c.hexCode}
+                            size="sm"
+                          />
+                          <div className="space-y-1">
+                            <Label htmlFor={`replace-img-${c.id}`}>
+                              Replace image
+                            </Label>
+                            <Input
+                              id={`replace-img-${c.id}`}
+                              type="file"
+                              accept="image/*"
+                              className="max-w-xs"
+                              disabled={uploadingColorId === c.id}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0] ?? null;
+                                if (f) {
+                                  replaceColorImageMutation.mutate({
+                                    colorId: c.id,
+                                    file: f,
+                                  });
+                                }
+                                e.target.value = "";
+                              }}
+                            />
+                            {uploadingColorId === c.id ? (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Uploading…
+                              </p>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                       <div className="flex gap-2 shrink-0">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setColorEditingId(c.id);
-                            setCn(c.colorName);
-                            setCnEn(c.colorNameEn);
-                            setCImg(c.imageUrl);
-                            setCActive(c.active);
-                            setCSort(String(c.sortOrder));
-                            setColorDialog(true);
-                          }}
+                          onClick={() => openEditColorDialog(c)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -590,7 +888,9 @@ export default function ProductEditPage() {
                                         min={0}
                                         step="0.01"
                                         className="h-8"
-                                        placeholder={basePrice.trim() || "Base"}
+                                        placeholder={
+                                          sellingPrice.trim() || "Default"
+                                        }
                                         value={row.price}
                                         onChange={(e) => {
                                           const v = e.target.value;
@@ -707,26 +1007,6 @@ export default function ProductEditPage() {
                   </div>
                 ))
               )}
-              <div
-                className={`flex justify-center pt-4 ${colors.length > 0 ? "border-t border-border/60 mt-2" : ""}`}
-              >
-                <Button
-                  size="sm"
-                  className="gap-1"
-                  onClick={() => {
-                    setColorEditingId(null);
-                    setCn("");
-                    setCnEn("");
-                    setCImg("");
-                    setCActive(true);
-                    setCSort("0");
-                    setColorDialog(true);
-                  }}
-                >
-                  <Plus className="h-4 w-4" />
-                  Add color
-                </Button>
-              </div>
             </CardContent>
           </Card>
         </>
@@ -736,31 +1016,78 @@ export default function ProductEditPage() {
         open={colorDialog}
         onOpenChange={(open) => {
           setColorDialog(open);
-          if (!open) setColorEditingId(null);
+          if (!open) {
+            setColorEditingId(null);
+            setVariantPresetActive(false);
+          }
         }}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {colorEditingId ? "Edit color" : "Add color"}
+              {colorEditingId ? "Edit color variant" : "Add color variant"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <div className="space-y-2">
-              <Label>Color name (display)</Label>
-              <Input value={cn} onChange={(e) => setCn(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Color name (English, optional)</Label>
-              <Input value={cnEn} onChange={(e) => setCnEn(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Image URL</Label>
-              <Input
-                value={cImg}
-                onChange={(e) => setCImg(e.target.value)}
-                placeholder="https://res.cloudinary.com/…/image/upload/…"
+            {colorEditingId ? (
+              <>
+                <LockedColorDisplay colorName={cn || "—"} hexCode={cHex} />
+                <p className="text-xs text-muted-foreground">
+                  Color name and hex are fixed. Delete this variant and add again to change.
+                </p>
+              </>
+            ) : (
+              <ColorVariantPicker
+                presets={colorPresets}
+                usedColorNames={colors.map((c) => c.colorName)}
+                colorName={cn}
+                hexCode={cHex}
+                presetActive={variantPresetActive}
+                onPresetSelect={selectVariantPreset}
+                onCustomColorNameChange={(value) => {
+                  setVariantPresetActive(false);
+                  setCn(value);
+                }}
+                onCustomHexChange={(value) => {
+                  setVariantPresetActive(false);
+                  setCHex(value);
+                }}
+                nameId="pe-variant-color-name"
+                hexId="pe-variant-color-hex"
               />
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="pe-variant-image">
+                {colorEditingId ? "Replace image" : "Image (this color)"}
+              </Label>
+              <Input
+                id="pe-variant-image"
+                type="file"
+                accept="image/*"
+                disabled={uploadingColorId === "dialog"}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  void uploadColorImage(f, setCImg, "dialog");
+                  e.target.value = "";
+                }}
+              />
+              {uploadingColorId === "dialog" && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Uploading…
+                </p>
+              )}
+              {cImg ? (
+                <img
+                  src={cImg}
+                  alt=""
+                  className="h-24 w-24 rounded-md object-cover border border-border"
+                />
+              ) : (
+                <div className="h-24 w-24 rounded-md border border-dashed border-muted-foreground/30 flex items-center justify-center text-xs text-muted-foreground text-center px-1">
+                  No image yet
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="c-sort">Sort order</Label>
@@ -787,6 +1114,7 @@ export default function ProductEditPage() {
               onClick={() => {
                 setColorDialog(false);
                 setColorEditingId(null);
+                setVariantPresetActive(false);
               }}
             >
               Cancel
@@ -798,7 +1126,7 @@ export default function ProductEditPage() {
               {saveColorMutation.isPending && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
-              {colorEditingId ? "Save" : "Add"}
+              {colorEditingId ? "Save" : "Add variant"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -806,4 +1134,3 @@ export default function ProductEditPage() {
     </div>
   );
 }
-

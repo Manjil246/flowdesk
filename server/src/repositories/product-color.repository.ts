@@ -7,7 +7,7 @@ export type ProductColorLean = Pick<
   | "_id"
   | "productId"
   | "colorName"
-  | "colorNameEn"
+  | "hexCode"
   | "imageUrl"
   | "active"
   | "sortOrder"
@@ -37,7 +37,7 @@ export class ProductColorRepository {
   async create(data: {
     productId: mongoose.Types.ObjectId;
     colorName: string;
-    colorNameEn: string;
+    hexCode: string;
     imageUrl: string;
     active: boolean;
     sortOrder: number;
@@ -50,7 +50,7 @@ export class ProductColorRepository {
     id: string,
     patch: Partial<{
       colorName: string;
-      colorNameEn: string;
+      hexCode: string;
       imageUrl: string;
       active: boolean;
       sortOrder: number;
@@ -75,5 +75,33 @@ export class ProductColorRepository {
     await ProductColor.deleteMany({
       productId: new mongoose.Types.ObjectId(productId),
     });
+  }
+
+  /** First active color image per product (for picker thumbnails). */
+  async findFirstActiveImageByProductIds(
+    productIds: string[],
+  ): Promise<Map<string, string>> {
+    if (productIds.length === 0) return new Map();
+
+    const objectIds = productIds.map((id) => new mongoose.Types.ObjectId(id));
+    const rows = await ProductColor.aggregate<{ _id: mongoose.Types.ObjectId; imageUrl: string }>([
+      {
+        $match: {
+          productId: { $in: objectIds },
+          active: true,
+          imageUrl: { $exists: true, $nin: ["", null] },
+        },
+      },
+      { $sort: { sortOrder: 1, colorName: 1 } },
+      { $group: { _id: "$productId", imageUrl: { $first: "$imageUrl" } } },
+    ]);
+
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (row.imageUrl?.trim()) {
+        map.set(String(row._id), row.imageUrl.trim());
+      }
+    }
+    return map;
   }
 }

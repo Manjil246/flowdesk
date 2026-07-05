@@ -5,6 +5,7 @@ export type OrderLineItemInput = {
   productName: string;
   colorId: string;
   colorName: string;
+  imageUrl?: string;
   size: string;
   quantity: number;
   unitPrice: number;
@@ -13,10 +14,19 @@ export type OrderLineItemInput = {
 
 export type OrderCreateInput = {
   orderReference: string;
-  conversationId: mongoose.Types.ObjectId;
-  customerWaPhone: string;
+  source?: "web" | "whatsapp" | "admin";
+  conversationId?: mongoose.Types.ObjectId | null;
+  customerWaPhone?: string | null;
+  customerEmail?: string | null;
+  customerName?: string | null;
   customerOrderPhone: string;
   deliveryLocation: string;
+  deliveryStreet?: string | null;
+  deliveryCity?: string | null;
+  deliveryDistrict?: string | null;
+  deliveryProvince?: string | null;
+  deliveryCustomerNotes?: string | null;
+  deliveryZipCode?: string | null;
   deliveryLocationLat?: number | null;
   deliveryLocationLng?: number | null;
   locationVerified: boolean;
@@ -36,6 +46,9 @@ export type OrderCreateInput = {
 export type OrderPatchInput = {
   status?: string;
   tags?: string[];
+  itemsSubtotal?: number;
+  deliveryCharge?: number;
+  grandTotal?: number;
   trackingReference?: string | null;
   dispatchNotes?: string | null;
   paymentNotes?: string | null;

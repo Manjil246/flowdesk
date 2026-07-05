@@ -2,9 +2,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 
 const messages = [
+  "Women's ready-to-wear · Est. 2025 · Chitwan",
   'New arrivals every week',
   'Pay with eSewa · Khalti · FonePay',
-  'Flat रू 150 delivery across Nepal',
+  'Nationwide delivery across Nepal',
 ];
 
 export default function AnnouncementBar() {

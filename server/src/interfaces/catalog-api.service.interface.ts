@@ -8,6 +8,7 @@ import type {
   ProductCreateFullBody,
   ProductListQuery,
   ProductPatchBody,
+  ProductPickerQuery,
   VariantStockPutBody,
 } from "../validationSchemas/catalog.VSchema";
 
@@ -28,20 +29,34 @@ export type ProductDto = {
   description: string;
   occasions: string[];
   fabric: string;
-  basePrice: number;
+  mrp: number;
+  sellingPrice: number;
   currency: string;
   allowedSizes: string[];
+  freeDelivery: boolean;
+  deliveryCharge: number;
   active: boolean;
   sortOrder: number;
   createdAt: string | null;
   updatedAt: string | null;
 };
 
+/** Slim row for admin product pickers (order create, etc.). */
+export type ProductPickerDto = {
+  id: string;
+  name: string;
+  sellingPrice: number;
+  mrp: number;
+  currency: string;
+  thumbnailUrl: string;
+  sortOrder: number;
+};
+
 export type ProductColorDto = {
   id: string;
   productId: string;
   colorName: string;
-  colorNameEn: string;
+  hexCode: string;
   imageUrl: string;
   active: boolean;
   sortOrder: number;
@@ -54,7 +69,7 @@ export type VariantStockDto = {
   variantId: string;
   productId: string;
   size: string;
-  /** Row price; `null` means inherit product `basePrice` in clients. */
+  /** Row price; `null` means inherit product `sellingPrice` in clients. */
   price: number | null;
   stock: number;
   isAvailable: boolean;
@@ -85,6 +100,7 @@ export interface ICatalogApiService {
   deleteCategory(categoryId: string): Promise<void>;
 
   listProducts(query: ProductListQuery): Promise<ProductDto[]>;
+  listProductsForPicker(query: ProductPickerQuery): Promise<ProductPickerDto[]>;
   getProduct(productId: string): Promise<ProductDto>;
   getProductDetail(productId: string): Promise<ProductDetailDto>;
   createProduct(body: ProductCreateBody): Promise<ProductDto>;

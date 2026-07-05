@@ -36,6 +36,26 @@ export function isAllowedAdminStatusTransition(
   return j === i + 1 || j === i - 1;
 }
 
+/** Reserve inventory when admin approves (order_placed → payment_confirmed). */
+export function shouldDeductStockOnTransition(
+  from: string | undefined | null,
+  to: OrderStatus,
+): boolean {
+  return from === "order_placed" && to === "payment_confirmed";
+}
+
+/** Return inventory when approval is undone or order is cancelled after stock was taken. */
+export function shouldRestoreStockOnTransition(
+  from: string | undefined | null,
+  to: OrderStatus,
+): boolean {
+  if (!from) return false;
+  if (to === "cancelled") {
+    return from === "payment_confirmed" || from === "dispatched";
+  }
+  return from === "payment_confirmed" && to === "order_placed";
+}
+
 export function describeInvalidAdminStatusTransition(
   from: string | undefined | null,
   to: OrderStatus,

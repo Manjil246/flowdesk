@@ -1,56 +1,125 @@
-import { useParams, Link } from 'react-router-dom';
-import { useState } from 'react';
-import { products } from '@/user/data/products';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useCartStore } from '@/user/stores/cartStore';
 import Navbar from '@/user/components/Navbar';
 import Footer from '@/user/components/Footer';
 import AnnouncementBar from '@/user/components/AnnouncementBar';
-import { Minus, Plus, Star, Truck, Shield } from 'lucide-react';
+import { Minus, Plus, Truck, Shield, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { fetchShopProduct } from '@/user/lib/shop-catalog';
+import ProductPrice from '@/user/components/ProductPrice';
+import ProductImageGallery from '@/user/components/ProductImageGallery';
+import ColorSwatch from '@/user/components/ColorSwatch';
+import { scaledMrp } from '@/user/lib/product-pricing';
 
 export default function ProductDetail() {
-  const { slug } = useParams();
-  const product = products.find(p => p.slug === slug);
-  const addItem = useCartStore(s => s.addItem);
-  const openCart = useCartStore(s => s.openCart);
+  const { productId } = useParams();
+  const navigate = useNavigate();
+  const addItem = useCartStore((s) => s.addItem);
+  const openCart = useCartStore((s) => s.openCart);
 
-  const [selectedColor, setSelectedColor] = useState(0);
-  const [selectedSize, setSelectedSize] = useState(0);
+  const { data: product, isLoading, error } = useQuery({
+    queryKey: ['shopProduct', productId],
+    queryFn: () => fetchShopProduct(productId!),
+    enabled: Boolean(productId),
+  });
+
+  const [selectedColorIndex, setSelectedColorIndex] = useState(0);
+  const [selectedSizeIndex, setSelectedSizeIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [mainImage, setMainImage] = useState(0);
 
-  if (!product) {
+  useEffect(() => {
+    setSelectedColorIndex(0);
+    setSelectedSizeIndex(0);
+    setQuantity(1);
+  }, [productId, product?.id]);
+
+  const selectedColor = product?.colors[selectedColorIndex];
+  const selectedSize = selectedColor?.sizes[selectedSizeIndex];
+
+  const displaySellingPrice = selectedSize?.price ?? product?.sellingPrice ?? 0;
+  const displayMrp =
+    product != null
+      ? scaledMrp(displaySellingPrice, product.sellingPrice, product.mrp)
+      : null;
+
+  const galleryImages = useMemo(
+    () =>
+      product?.colors.map((color) => ({
+        src: color.imageUrl,
+        alt: `${product?.name ?? 'Product'} — ${color.colorName}`,
+      })) ?? [],
+    [product],
+  );
+
+  const sizesForSelectedColor = useMemo(
+    () => selectedColor?.sizes ?? [],
+    [selectedColor],
+  );
+
+  useEffect(() => {
+    if (selectedSizeIndex >= sizesForSelectedColor.length) {
+      setSelectedSizeIndex(0);
+    }
+  }, [selectedSizeIndex, sizesForSelectedColor.length]);
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center px-4">
           <h1 className="font-display text-4xl mb-4">Product Not Found</h1>
-          <Link to="/products" className="text-accent underline">Back to Products</Link>
+          <Link to="/products" className="text-accent-foreground underline">
+            Back to Shop
+          </Link>
         </div>
       </div>
     );
   }
 
-  const colors = [...new Map(product.variants.map(v => [v.color, { name: v.color, hex: v.colorHex }])).values()];
-  const sizesForColor = product.variants.filter(v => v.color === colors[selectedColor]?.name).map(v => v.size);
-  const allSizes = [...new Set(product.variants.map(v => v.size))];
-  const currentVariant = product.variants.find(v => v.color === colors[selectedColor]?.name && v.size === allSizes[selectedSize]);
+  const hasFreeDelivery = product.freeDelivery || product.deliveryCharge === 0;
 
-  const handleAddToCart = () => {
-    if (!currentVariant) { toast.error('Please select size and color'); return; }
+  const formatMoney = (amount: number) =>
+    `रू ${amount.toLocaleString('en-NP', { maximumFractionDigits: 0 })}`;
+
+  const handleAddToCart = (goCheckout = false) => {
+    if (!selectedColor || !selectedSize) {
+      toast.error('Please select a color and size');
+      return;
+    }
+    if (selectedSize.stock <= 0) {
+      toast.error('This size is out of stock');
+      return;
+    }
     addItem({
       productId: product.id,
-      variantId: currentVariant.id,
+      colorId: selectedColor.id,
+      variantId: selectedSize.stockId,
       name: product.name,
-      image: product.images[0],
-      size: currentVariant.size,
-      color: currentVariant.color,
-      price: currentVariant.price,
+      image: selectedColor.imageUrl,
+      size: selectedSize.size,
+      color: selectedColor.colorName,
+      price: selectedSize.price,
       quantity,
-      maxStock: currentVariant.stock,
+      maxStock: selectedSize.stock,
+      freeDelivery: hasFreeDelivery,
+      deliveryCharge: hasFreeDelivery ? 0 : product.deliveryCharge,
     });
     toast.success('Added to cart');
-    openCart();
+    if (goCheckout) {
+      navigate('/checkout');
+    } else {
+      openCart();
+    }
   };
 
   return (
@@ -59,164 +128,276 @@ export default function ProductDetail() {
       <Navbar />
       <div className="pt-24 pb-20">
         <div className="container mx-auto px-4">
-          {/* Breadcrumb */}
           <div className="flex items-center gap-2 mb-8 font-body text-xs text-muted-foreground">
-            <Link to="/" className="hover:text-foreground">Home</Link>
+            <Link to="/" className="hover:text-foreground">
+              Home
+            </Link>
             <span>/</span>
-            <Link to={`/products?category=${product.categoryId}`} className="hover:text-foreground">{product.category}</Link>
+            <Link to="/products" className="hover:text-foreground">
+              Shop
+            </Link>
             <span>/</span>
             <span className="text-foreground">{product.name}</span>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-16">
-            {/* Images */}
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-              <div className="aspect-[4/5] overflow-hidden rounded-sm mb-4 group cursor-zoom-in">
-                <img
-                  src={product.images[mainImage]}
-                  alt={product.name}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.15]"
-                />
-              </div>
-              {product.images.length > 1 && (
-                <div className="flex gap-2">
-                  {product.images.map((img, i) => (
-                    <button key={i} onClick={() => setMainImage(i)} className={`w-16 h-20 rounded-sm overflow-hidden border-2 transition-colors ${mainImage === i ? 'border-accent' : 'border-transparent'}`}>
-                      <img src={img} alt="" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4 }}
+              className="relative lg:overflow-visible"
+            >
+              <ProductImageGallery
+                images={galleryImages}
+                selectedIndex={selectedColorIndex}
+                onSelectIndex={(index) => {
+                  setSelectedColorIndex(index);
+                  setSelectedSizeIndex(0);
+                }}
+              />
             </motion.div>
 
-            {/* Info */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }}>
-              <p className="font-body text-[10px] uppercase tracking-[2px] text-accent font-medium mb-2">StyleSutra Exclusive</p>
-              <h1 className="font-display text-3xl lg:text-4xl font-normal text-foreground leading-[1.2] mb-3">{product.name}</h1>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+            >
+              <p className="font-body text-[10px] uppercase tracking-[2px] text-accent-foreground font-medium mb-2">
+                {product.categoryName}
+              </p>
+              <h1 className="font-display text-3xl lg:text-4xl font-normal text-foreground leading-[1.2] mb-3">
+                {product.name}
+              </h1>
 
-              {/* Rating */}
-              <div className="flex items-center gap-2 mb-4">
-                <div className="flex gap-0.5">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} size={14} className={i < Math.floor(product.rating) ? 'fill-accent text-accent' : 'text-border'} />
-                  ))}
-                </div>
-                <span className="font-body text-xs text-muted-foreground">{product.rating} ({product.reviewCount} reviews)</span>
-              </div>
-
-              {/* Price */}
               <div className="mb-6">
-                <span className="font-body text-2xl font-semibold text-foreground">रू {product.basePrice.toLocaleString()}</span>
-                <p className="font-body text-[11px] text-muted-foreground mt-1">Inclusive of all taxes</p>
+                <ProductPrice
+                  sellingPrice={displaySellingPrice}
+                  mrp={displayMrp ?? product.mrp}
+                  currency={product.currency}
+                  size="lg"
+                />
+                <p className="font-body text-[11px] text-muted-foreground mt-1">
+                  Ready-to-wear · Inclusive of all taxes
+                </p>
+                {hasFreeDelivery ? (
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-sm border border-success/30 bg-success/10 px-3 py-2">
+                    <Truck
+                      size={15}
+                      strokeWidth={1.5}
+                      className="text-success shrink-0"
+                      aria-hidden
+                    />
+                    <span className="font-body text-xs font-semibold text-success">
+                      Free delivery on this item
+                    </span>
+                  </div>
+                ) : (
+                  <p className="font-body text-xs text-muted-foreground mt-3">
+                    Delivery charge:{' '}
+                    <span className="font-medium text-foreground">
+                      {formatMoney(product.deliveryCharge)}
+                    </span>{' '}
+                    nationwide
+                  </p>
+                )}
               </div>
 
-              {/* Stock */}
-              {currentVariant && (
-                <p className={`font-body text-xs font-medium mb-4 ${currentVariant.stock <= 5 ? 'text-cta' : 'text-success'}`}>
-                  {currentVariant.stock <= 5 ? `Only ${currentVariant.stock} left!` : 'In Stock'}
+              {selectedSize && (
+                <p
+                  className={`font-body text-xs font-medium mb-4 ${
+                    selectedSize.stock <= 5 ? 'text-cta' : 'text-success'
+                  }`}
+                >
+                  {selectedSize.stock <= 0
+                    ? 'Out of stock'
+                    : selectedSize.stock <= 5
+                      ? `Only ${selectedSize.stock} left!`
+                      : 'In Stock'}
                 </p>
               )}
 
-              {/* Color */}
               <div className="mb-6">
                 <p className="font-body text-xs font-medium text-foreground mb-3">
-                  Color — <span className="text-muted-foreground">{colors[selectedColor]?.name}</span>
+                  Color —{' '}
+                  <span className="text-muted-foreground">
+                    {selectedColor?.colorName}
+                  </span>
                 </p>
-                <div className="flex gap-2">
-                  {colors.map((color, i) => (
-                    <button
-                      key={color.name}
-                      onClick={() => setSelectedColor(i)}
-                      className={`w-8 h-8 rounded-full border-2 transition-all ${selectedColor === i ? 'border-foreground scale-110' : 'border-border'}`}
-                      style={{ backgroundColor: color.hex }}
-                      title={color.name}
+                <div className="flex flex-wrap gap-3 items-center">
+                  {product.colors.map((color, i) => (
+                    <ColorSwatch
+                      key={color.id}
+                      hexCode={color.hexCode}
+                      label={color.colorName}
+                      selected={selectedColorIndex === i}
+                      onClick={() => {
+                        setSelectedColorIndex(i);
+                        setSelectedSizeIndex(0);
+                      }}
                     />
                   ))}
                 </div>
               </div>
 
-              {/* Size */}
               <div className="mb-6">
                 <p className="font-body text-xs font-medium text-foreground mb-3">
-                  Size — <span className="text-muted-foreground">{allSizes[selectedSize]}</span>
+                  Size —{' '}
+                  <span className="text-muted-foreground">
+                    {selectedSize?.size ?? '—'}
+                  </span>
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {allSizes.map((size, i) => {
-                    const available = sizesForColor.includes(size);
+                  {sizesForSelectedColor.map((sizeOption, i) => {
+                    const out = sizeOption.stock <= 0;
                     return (
                       <button
-                        key={size}
-                        onClick={() => available && setSelectedSize(i)}
+                        key={sizeOption.stockId}
+                        type="button"
+                        disabled={out}
+                        onClick={() => setSelectedSizeIndex(i)}
                         className={`min-w-[44px] h-10 px-3 border rounded-sm font-body text-xs font-medium transition-all ${
-                          selectedSize === i ? 'border-foreground bg-foreground text-primary-foreground' :
-                          available ? 'border-border text-foreground hover:border-foreground' :
-                          'border-border text-muted-foreground/40 cursor-not-allowed line-through'
+                          selectedSizeIndex === i
+                            ? 'border-foreground bg-foreground text-primary-foreground'
+                            : out
+                              ? 'border-border text-muted-foreground/40 cursor-not-allowed line-through'
+                              : 'border-border text-foreground hover:border-foreground'
                         }`}
                       >
-                        {size}
+                        {sizeOption.size}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Quantity */}
               <div className="mb-6">
-                <p className="font-body text-xs font-medium text-foreground mb-3">Quantity</p>
+                <p className="font-body text-xs font-medium text-foreground mb-3">
+                  Quantity
+                </p>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-10 h-10 border border-border rounded-sm flex items-center justify-center hover:border-foreground transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="w-10 h-10 border border-border rounded-sm flex items-center justify-center hover:border-foreground transition-colors"
+                  >
                     <Minus size={14} />
                   </button>
-                  <span className="font-body text-sm font-medium w-8 text-center">{quantity}</span>
-                  <button onClick={() => setQuantity(Math.min(currentVariant?.stock || 20, quantity + 1))} className="w-10 h-10 border border-border rounded-sm flex items-center justify-center hover:border-foreground transition-colors">
+                  <span className="font-body text-sm font-medium w-8 text-center">
+                    {quantity}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setQuantity(
+                        Math.min(selectedSize?.stock || 20, quantity + 1),
+                      )
+                    }
+                    className="w-10 h-10 border border-border rounded-sm flex items-center justify-center hover:border-foreground transition-colors"
+                  >
                     <Plus size={14} />
                   </button>
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="space-y-3 mb-8">
-                <button onClick={handleAddToCart} className="w-full bg-foreground text-primary-foreground py-3.5 font-body text-[11px] font-semibold uppercase tracking-[1.5px] rounded-sm hover:bg-foreground/85 active:scale-[0.97] transition-all">
+                <button
+                  type="button"
+                  onClick={() => handleAddToCart(false)}
+                  className="w-full bg-foreground text-primary-foreground py-3.5 font-body text-[11px] font-semibold uppercase tracking-[1.5px] rounded-sm hover:bg-foreground/85 active:scale-[0.97] transition-all"
+                >
                   Add to Cart
                 </button>
-                <Link to="/checkout" onClick={handleAddToCart} className="w-full block text-center border border-foreground text-foreground py-3.5 font-body text-[11px] font-semibold uppercase tracking-[1.5px] rounded-sm hover:bg-surface transition-all">
+                <button
+                  type="button"
+                  onClick={() => handleAddToCart(true)}
+                  className="w-full border border-foreground text-foreground py-3.5 font-body text-[11px] font-semibold uppercase tracking-[1.5px] rounded-sm hover:bg-surface transition-all"
+                >
                   Buy Now
-                </Link>
+                </button>
               </div>
 
-              {/* Delivery info */}
               <div className="border border-border rounded-sm p-4 space-y-3">
-                {[
-                  { icon: Truck, text: 'Delivery charge: रू 150 across Nepal' },
-                  { icon: Shield, text: 'Estimated 2–4 days in Kathmandu Valley, 4–7 days elsewhere' },
-                ].map(({ icon: Icon, text }) => (
-                  <div key={text} className="flex items-center gap-3">
-                    <Icon size={16} strokeWidth={1.2} className="text-accent flex-shrink-0" />
-                    <span className="font-body text-xs text-muted-foreground">{text}</span>
+                {hasFreeDelivery ? (
+                  <div className="flex items-start gap-3 rounded-sm border border-success/25 bg-success/5 px-3 py-3">
+                    <Truck
+                      size={18}
+                      strokeWidth={1.5}
+                      className="text-success flex-shrink-0 mt-0.5"
+                      aria-hidden
+                    />
+                    <div>
+                      <p className="font-body text-sm font-semibold text-success">
+                        Free delivery
+                      </p>
+                      <p className="font-body text-xs text-muted-foreground mt-0.5">
+                        No delivery charge on this product
+                      </p>
+                    </div>
                   </div>
-                ))}
+                ) : (
+                  <div className="flex items-start gap-3">
+                    <Truck
+                      size={16}
+                      strokeWidth={1.2}
+                      className="text-accent-foreground flex-shrink-0 mt-0.5"
+                      aria-hidden
+                    />
+                    <div>
+                      <p className="font-body text-sm font-medium text-foreground">
+                        Delivery charge
+                      </p>
+                      <p className="font-body text-xs text-muted-foreground mt-0.5">
+                        {formatMoney(product.deliveryCharge)} — estimated 2–4 days in
+                        Chitwan &amp; nearby, 4–7 days elsewhere in Nepal
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <Shield
+                    size={16}
+                    strokeWidth={1.2}
+                    className="text-accent-foreground flex-shrink-0"
+                    aria-hidden
+                  />
+                  <span className="font-body text-xs text-muted-foreground">
+                    {hasFreeDelivery
+                      ? 'Estimated 2–4 days in Chitwan & nearby, 4–7 days elsewhere in Nepal'
+                      : 'Secure checkout · Pay with eSewa, Khalti, or FonePay'}
+                  </span>
+                </div>
               </div>
             </motion.div>
           </div>
 
-          {/* Description */}
           <div className="mt-16 border-t border-border pt-12">
-            <h2 className="font-display text-2xl text-foreground mb-4">Description</h2>
-            <p className="font-body text-sm text-muted-foreground leading-[1.7] max-w-2xl">{product.description}</p>
-            <div className="mt-6 flex flex-wrap gap-2">
-              {product.tags.map(tag => (
-                <span key={tag} className="px-3 py-1 bg-surface rounded-sm font-body text-[11px] uppercase tracking-[1px] text-muted-foreground">
-                  {tag}
-                </span>
-              ))}
-            </div>
+            <h2 className="font-display text-2xl text-foreground mb-4">
+              Description
+            </h2>
+            <p className="font-body text-sm text-muted-foreground leading-[1.7] max-w-2xl">
+              {product.description || 'No description provided yet.'}
+            </p>
+            {(product.fabric || product.occasions.length > 0) && (
+              <div className="mt-6 flex flex-wrap gap-2">
+                {product.fabric ? (
+                  <span className="px-3 py-1 bg-surface rounded-sm font-body text-[11px] uppercase tracking-[1px] text-muted-foreground">
+                    {product.fabric}
+                  </span>
+                ) : null}
+                {product.occasions.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-3 py-1 bg-surface rounded-sm font-body text-[11px] uppercase tracking-[1px] text-muted-foreground"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-
         </div>
       </div>
       <Footer />
     </div>
   );
 }
-
-

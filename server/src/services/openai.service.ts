@@ -102,7 +102,7 @@ export class OpenAIService implements IOpenAIService {
         ? {
             max_completion_tokens: OPENAI_MAX_COMPLETION_TOKENS,
             ...(OPENAI_MODEL.toLowerCase().includes("gpt-5")
-              ? { reasoning_effort: "minimal" }
+              ? { reasoning_effort: "low" }
               : {}),
           }
         : {

@@ -13,7 +13,9 @@ import {
   validateParams,
   validateQueryParams,
 } from "../middlewares/validationMiddleware";
+import { authenticate } from "../middlewares/auth.middleware";
 import {
+  createAdminOrderBodySchema,
   orderIdParamsSchema,
   orderListQuerySchema,
   orderPatchBodySchema,
@@ -23,31 +25,42 @@ export class OrderRoutes {
   private router = Router();
 
   constructor() {
+    const variantStockRepository = new VariantStockRepository();
     const catalogService = new CatalogService(
       new CategoryRepository(),
       new ProductRepository(),
       new ProductColorRepository(),
-      new VariantStockRepository(),
+      variantStockRepository,
     );
     const shopOrderService = new ShopOrderService(
       catalogService,
       new OrderRepository(),
       new ConversationRepository(),
+      variantStockRepository,
     );
     const controller = new OrderController(shopOrderService);
 
     this.router.get(
       "/",
+      authenticate,
       validateQueryParams(orderListQuerySchema),
       controller.listOrders,
     );
+    this.router.post(
+      "/",
+      authenticate,
+      validateBody(createAdminOrderBodySchema),
+      controller.createOrder,
+    );
     this.router.get(
       "/:orderId",
+      authenticate,
       validateParams(orderIdParamsSchema),
       controller.getOrder,
     );
     this.router.patch(
       "/:orderId",
+      authenticate,
       validateParams(orderIdParamsSchema),
       validateBody(orderPatchBodySchema),
       controller.patchOrder,

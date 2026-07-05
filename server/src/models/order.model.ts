@@ -6,6 +6,7 @@ const orderLineItemSchema = new Schema(
     productName: { type: String, required: true, trim: true },
     colorId: { type: String, required: true, trim: true },
     colorName: { type: String, required: true, trim: true },
+    imageUrl: { type: String, default: "", trim: true },
     size: { type: String, required: true, trim: true },
     quantity: { type: Number, required: true, min: 1 },
     unitPrice: { type: Number, required: true, min: 0 },
@@ -25,15 +26,29 @@ const orderSchema = new Schema(
       unique: true,
       index: true,
     },
+    source: {
+      type: String,
+      enum: ["web", "whatsapp", "admin"],
+      default: "whatsapp",
+      index: true,
+    },
     conversationId: {
       type: Schema.Types.ObjectId,
       ref: "Conversation",
-      required: true,
+      default: null,
       index: true,
     },
-    customerWaPhone: { type: String, required: true, trim: true },
+    customerWaPhone: { type: String, default: null, trim: true },
+    customerEmail: { type: String, default: null, trim: true, lowercase: true },
+    customerName: { type: String, default: null, trim: true },
     customerOrderPhone: { type: String, required: true, trim: true },
     deliveryLocation: { type: String, required: true, trim: true },
+    deliveryStreet: { type: String, default: null, trim: true },
+    deliveryCity: { type: String, default: null, trim: true },
+    deliveryDistrict: { type: String, default: null, trim: true },
+    deliveryProvince: { type: String, default: null, trim: true },
+    deliveryCustomerNotes: { type: String, default: null, trim: true },
+    deliveryZipCode: { type: String, default: null, trim: true },
     deliveryLocationLat: { type: Number, default: null },
     deliveryLocationLng: { type: Number, default: null },
     locationVerified: { type: Boolean, required: true, default: false },
@@ -65,6 +80,7 @@ const orderSchema = new Schema(
 
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ customerWaPhone: 1, orderReference: 1 });
+orderSchema.index({ customerEmail: 1, orderReference: 1 });
 
 export type OrderDoc = InferSchemaType<typeof orderSchema> & {
   _id: mongoose.Types.ObjectId;

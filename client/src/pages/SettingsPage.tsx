@@ -13,9 +13,9 @@ interface TeamMember {
 }
 
 const initialTeam: TeamMember[] = [
-  { name: "Admin User", email: "admin@flowdesk.com", role: "Owner", initials: "AD", color: "bg-primary" },
-  { name: "Ravi Kapoor", email: "ravi@flowdesk.com", role: "Admin", initials: "RK", color: "bg-blue-500" },
-  { name: "Meera Shah", email: "meera@flowdesk.com", role: "Agent", initials: "MS", color: "bg-pink-500" },
+  { name: "Admin User", email: "hello@stylesutra.com.np", role: "Owner", initials: "AD", color: "bg-primary" },
+  { name: "Ravi Kapoor", email: "ravi@stylesutra.com.np", role: "Admin", initials: "RK", color: "bg-blue-500" },
+  { name: "Meera Shah", email: "meera@stylesutra.com.np", role: "Agent", initials: "MS", color: "bg-pink-500" },
 ];
 
 const roleIcons: Record<string, typeof Crown> = { Owner: Crown, Admin: Shield, Agent: User };
@@ -106,7 +106,7 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-4xl">
+    <div className="p-4 lg:p-6 space-y-6 max-w-4xl mx-auto">
       <div className="flex gap-1 overflow-x-auto border-b border-border">
         {tabs.map((tab) => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={`shrink-0 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 ${activeTab === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{tab}</button>
@@ -120,11 +120,11 @@ export default function SettingsPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="text-sm font-medium text-foreground">Business Name</label>
-              <input type="text" defaultValue="FlowDesk Technologies" className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/30" />
+              <input type="text" defaultValue="StyleSutra" className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/30" />
             </div>
             <div>
               <label className="text-sm font-medium text-foreground">Business Email</label>
-              <input type="email" defaultValue="hello@flowdesk.com" className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/30" />
+              <input type="email" defaultValue="hello@stylesutra.com.np" className="mt-1 w-full rounded-md border border-border px-3 py-2 text-sm outline-hidden focus:ring-2 focus:ring-primary/30" />
             </div>
             <div>
               <label className="text-sm font-medium text-foreground">Timezone</label>

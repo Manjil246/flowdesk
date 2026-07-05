@@ -9,6 +9,7 @@ import type {
   ProductIdParams,
   ProductListQuery,
   ProductPatchBody,
+  ProductPickerQuery,
   VariantStockPutBody,
 } from "../validationSchemas/catalog.VSchema";
 import {
@@ -16,6 +17,7 @@ import {
   DbNotReadyError,
   NotFoundError,
 } from "../errors/service.errors";
+import { COLOR_PRESETS } from "../constants/preset-colors";
 
 export class ProductController {
   constructor(private readonly catalogService: ICatalogApiService) {}
@@ -32,6 +34,21 @@ export class ProductController {
       }
       console.error("[products] list", e);
       res.status(500).json({ error: "Failed to load products" });
+    }
+  };
+
+  listProductsForPicker = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const query = req.validatedQuery as ProductPickerQuery;
+      const products = await this.catalogService.listProductsForPicker(query);
+      res.json({ products });
+    } catch (e) {
+      if (e instanceof DbNotReadyError) {
+        res.status(503).json({ error: e.message });
+        return;
+      }
+      console.error("[products] picker", e);
+      res.status(500).json({ error: "Failed to load product picker options" });
     }
   };
 
@@ -304,5 +321,9 @@ export class ProductController {
       console.error("[products] stock replace", e);
       res.status(500).json({ error: "Failed to save stock" });
     }
+  };
+
+  listColorPresets = (_req: Request, res: Response): void => {
+    res.json({ presets: COLOR_PRESETS });
   };
 }

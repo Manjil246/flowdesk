@@ -22,16 +22,18 @@ let persistence: IWebhookPersistenceService | null = null;
 function getWebhookPersistence(): IWebhookPersistenceService {
   if (!persistence) {
     const messageRepository = new MessageRepository();
+    const variantStockRepository = new VariantStockRepository();
     const catalogService = new CatalogService(
       new CategoryRepository(),
       new ProductRepository(),
       new ProductColorRepository(),
-      new VariantStockRepository(),
+      variantStockRepository,
     );
     const shopOrderService = new ShopOrderService(
       catalogService,
       new OrderRepository(),
       new ConversationRepository(),
+      variantStockRepository,
     );
     const botReplyService = new BotReplyService(
       new OpenAIService(),

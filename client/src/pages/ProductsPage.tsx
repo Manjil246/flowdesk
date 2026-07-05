@@ -37,11 +37,7 @@ import {
 } from "@/components/ui/dialog";
 
 function categoryName(categories: CategoryDto[], id: string): string {
-  return categories.find((c) => c.id === id)?.name ?? id.slice(0, 8);
-}
-
-function shortId(id: string): string {
-  return id.length > 10 ? `${id.slice(0, 10)}…` : id;
+  return categories.find((c) => c.id === id)?.name ?? "—";
 }
 
 export default function ProductsPage() {
@@ -83,13 +79,10 @@ export default function ProductsPage() {
   });
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Products
-          </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="font-body text-sm text-muted-foreground">
             Manage products, colors, and stock. Open a row to edit details.
           </p>
         </div>
@@ -168,15 +161,11 @@ export default function ProductsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12 text-center">#</TableHead>
                     <TableHead>Name</TableHead>
-                    <TableHead className="hidden sm:table-cell">Category</TableHead>
-                    <TableHead className="font-mono text-xs hidden lg:table-cell">
-                      Id
-                    </TableHead>
-                    <TableHead className="hidden md:table-cell w-[90px]">
-                      Status
-                    </TableHead>
-                    <TableHead className="text-right">Price</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead className="w-[90px]">Status</TableHead>
+                    <TableHead className="text-right">Selling price</TableHead>
                     <TableHead className="w-[120px] text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -191,8 +180,11 @@ export default function ProductsPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    products.map((p) => (
+                    products.map((p, index) => (
                       <TableRow key={p.id}>
+                        <TableCell className="text-center text-muted-foreground tabular-nums">
+                          {index + 1}
+                        </TableCell>
                         <TableCell className="font-medium">
                           <Link
                             to={`/admin/products/${p.id}`}
@@ -201,16 +193,10 @@ export default function ProductsPage() {
                             {p.name}
                           </Link>
                         </TableCell>
-                        <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
+                        <TableCell className="text-muted-foreground text-sm">
                           {categoryName(categories, p.categoryId)}
                         </TableCell>
-                        <TableCell
-                          className="text-muted-foreground font-mono text-xs max-w-[120px] truncate hidden lg:table-cell"
-                          title={p.id}
-                        >
-                          {shortId(p.id)}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
+                        <TableCell>
                           {p.active ? (
                             <Badge variant="secondary" className="font-normal">
                               Active
@@ -222,7 +208,12 @@ export default function ProductsPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {p.currency} {p.basePrice}
+                          <span>{p.currency} {p.sellingPrice.toLocaleString()}</span>
+                          {p.mrp > p.sellingPrice && (
+                            <span className="block text-xs text-muted-foreground line-through">
+                              MRP {p.currency} {p.mrp.toLocaleString()}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" className="h-8 w-8" asChild>

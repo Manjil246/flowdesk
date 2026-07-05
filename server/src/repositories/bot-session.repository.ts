@@ -10,7 +10,7 @@ export type NumberedProduct = {
   n: number;
   id: string;
   name: string;
-  basePrice: number;
+  sellingPrice: number;
 };
 export type NumberedColor = {
   n: number;
@@ -24,7 +24,7 @@ export type ProductDetailSnapshot = {
   description: string;
   fabric: string;
   occasions: string[];
-  basePrice: number;
+  sellingPrice: number;
   currency: string;
   sizes: string[];
   colors: NumberedColor[];
@@ -386,7 +386,7 @@ export class BotSessionRepository {
       colorName: color.name,
       size,
       imageUrl: color.imageUrl,
-      unitPrice: detail.basePrice,
+      unitPrice: detail.sellingPrice,
       currency: detail.currency,
     };
   }

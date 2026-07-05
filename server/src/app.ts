@@ -8,7 +8,12 @@ import { CategoryRoutes } from "./routes/category.route";
 import { ProductRoutes } from "./routes/product.route";
 import { UploadRoutes } from "./routes/upload.route";
 import { OrderRoutes } from "./routes/order.route";
-import { BACKEND_BASE_URL, FRONTEND_BASE_URL, LOCAL_DEVELOPMENT_URL } from "./config/imports";
+import { ContactRoutes } from "./routes/contact.route";
+import { ShopRoutes } from "./routes/shop.route";
+import { AuthRoutes } from "./routes/auth.route";
+import { BACKEND_BASE_URL, FRONTEND_BASE_URL, LOCAL_DEVELOPMENT_URL, NODE_ENV } from "./config/imports";
+import { MongoDB } from "./config/connectToMongo";
+import { isMongoReady } from "./lib/db-ready";
 
 export class App {
   private app: Application;
@@ -20,6 +25,16 @@ export class App {
   }
 
   private initializeMiddlewares(): void {
+    this.app.use(async (_req, _res, next) => {
+      try {
+        if (!isMongoReady()) {
+          await MongoDB.getInstance().connect();
+        }
+        next();
+      } catch (error) {
+        next(error);
+      }
+    });
     this.app.use(express.json({ limit: "50mb" }));
     this.app.use(express.urlencoded({ limit: "50mb", extended: true }));
     this.app.use(cookieParser());
@@ -27,7 +42,7 @@ export class App {
       origin: [FRONTEND_BASE_URL, BACKEND_BASE_URL].filter(Boolean),
       credentials: true,
     };
-    if (LOCAL_DEVELOPMENT_URL) {
+    if (NODE_ENV !== "production" && LOCAL_DEVELOPMENT_URL) {
       (corsOptions.origin as string[]).push(LOCAL_DEVELOPMENT_URL);
     }
     this.app.use(cors(corsOptions));
@@ -41,14 +56,20 @@ export class App {
     const productRoutes = new ProductRoutes();
     const uploadRoutes = new UploadRoutes();
     const orderRoutes = new OrderRoutes();
+    const contactRoutes = new ContactRoutes();
+    const shopRoutes = new ShopRoutes();
+    const authRoutes = new AuthRoutes();
 
     this.app.use("/webhook", webhookRoutes.getRouter());
+    this.app.use("/api/v1/auth", authRoutes.getRouter());
     this.app.use("/api/v1/health-check", healthCheckRoutes.getRouter());
     this.app.use("/api/v1/conversations", conversationRoutes.getRouter());
     this.app.use("/api/v1/categories", categoryRoutes.getRouter());
     this.app.use("/api/v1/products", productRoutes.getRouter());
     this.app.use("/api/v1/uploads", uploadRoutes.getRouter());
     this.app.use("/api/v1/orders", orderRoutes.getRouter());
+    this.app.use("/api/v1/contact", contactRoutes.getRouter());
+    this.app.use("/api/v1/shop", shopRoutes.getRouter());
   }
 
   public getApp(): Application {

@@ -10,6 +10,7 @@ import {
   validateParams,
   validateQueryParams,
 } from "../middlewares/validationMiddleware";
+import { authenticate } from "../middlewares/auth.middleware";
 import {
   categoryCreateBodySchema,
   categoryIdParamsSchema,
@@ -36,22 +37,26 @@ export class CategoryRoutes {
     );
     this.router.post(
       "/",
+      authenticate,
       validateBody(categoryCreateBodySchema),
       controller.createCategory,
     );
     this.router.get(
       "/:categoryId",
+      authenticate,
       validateParams(categoryIdParamsSchema),
       controller.getCategory,
     );
     this.router.patch(
       "/:categoryId",
+      authenticate,
       validateParams(categoryIdParamsSchema),
       validateBody(categoryPatchBodySchema),
       controller.updateCategory,
     );
     this.router.delete(
       "/:categoryId",
+      authenticate,
       validateParams(categoryIdParamsSchema),
       controller.deleteCategory,
     );

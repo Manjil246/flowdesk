@@ -50,6 +50,17 @@ export class OrderRepository {
     return row as OrderLean | null;
   }
 
+  async findByOrderReferenceAndEmail(
+    orderReference: string,
+    email: string,
+  ): Promise<OrderLean | null> {
+    const row = await Order.findOne({
+      orderReference: orderReference.trim().toUpperCase(),
+      customerEmail: email.trim().toLowerCase(),
+    }).lean();
+    return row as OrderLean | null;
+  }
+
   async updateById(orderId: string, patch: OrderPatchInput): Promise<boolean> {
     if (!mongoose.isValidObjectId(orderId)) return false;
     const res = await Order.updateOne(

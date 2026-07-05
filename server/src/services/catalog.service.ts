@@ -6,6 +6,7 @@ import type {
   ProductColorWithStockDto,
   ProductDetailDto,
   ProductDto,
+  ProductPickerDto,
   VariantStockDto,
 } from "../interfaces/catalog-api.service.interface";
 import { CategoryRepository } from "../repositories/category.repository";
@@ -32,8 +33,25 @@ import type {
   ProductCreateFullBody,
   ProductListQuery,
   ProductPatchBody,
+  ProductPickerQuery,
   VariantStockPutBody,
 } from "../validationSchemas/catalog.VSchema";
+import { SHOP_DELIVERY_CHARGE_NPR } from "../constants/shop-orders";
+import { resolveProductPricing } from "../lib/product-pricing";
+
+function normalizeDeliveryForWrite(body: {
+  freeDelivery?: boolean;
+  deliveryCharge?: number;
+}): { freeDelivery: boolean; deliveryCharge: number } {
+  const freeDelivery = body.freeDelivery ?? false;
+  if (freeDelivery) {
+    return { freeDelivery: true, deliveryCharge: 0 };
+  }
+  return {
+    freeDelivery: false,
+    deliveryCharge: body.deliveryCharge ?? SHOP_DELIVERY_CHARGE_NPR,
+  };
+}
 
 function iso(d?: Date | null): string | null {
   if (!d) return null;
@@ -111,6 +129,35 @@ export class CatalogService implements ICatalogApiService {
     return rows.map((r) => this.toProductDto(r));
   }
 
+  async listProductsForPicker(
+    query: ProductPickerQuery,
+  ): Promise<ProductPickerDto[]> {
+    this.assertDb();
+    const rows = await this.productRepository.findMany({
+      categoryId: query.categoryId,
+      active: query.active,
+      search: query.search,
+      skip: query.skip,
+      limit: query.limit,
+    });
+    if (rows.length === 0) return [];
+
+    const thumbs =
+      await this.productColorRepository.findFirstActiveImageByProductIds(
+        rows.map((r) => String(r._id)),
+      );
+
+    return rows.map((r) => ({
+      id: String(r._id),
+      name: r.name,
+      sellingPrice: r.sellingPrice,
+      mrp: r.mrp,
+      currency: r.currency ?? "NPR",
+      thumbnailUrl: thumbs.get(String(r._id)) ?? "",
+      sortOrder: r.sortOrder ?? 0,
+    }));
+  }
+
   async getProduct(productId: string): Promise<ProductDto> {
     this.assertDb();
     const row = await this.productRepository.findById(productId);
@@ -123,17 +170,21 @@ export class CatalogService implements ICatalogApiService {
     const product = await this.productRepository.findById(productId);
     if (!product) throw new NotFoundError("Product not found");
     const colors = await this.productColorRepository.findByProductId(productId);
-    const withStock: ProductColorWithStockDto[] = await Promise.all(
-      colors.map(async (c) => {
-        const stockRows = await this.variantStockRepository.findByVariantId(
-          String(c._id),
-        );
-        return {
-          ...this.toProductColorDto(c),
-          stock: stockRows.map((s) => this.toVariantStockDto(s)),
-        };
-      }),
-    );
+    const allStock =
+      await this.variantStockRepository.findByProductId(productId);
+    const stockByVariantId = new Map<string, VariantStockLean[]>();
+    for (const row of allStock) {
+      const variantId = String(row.variantId);
+      const list = stockByVariantId.get(variantId);
+      if (list) list.push(row);
+      else stockByVariantId.set(variantId, [row]);
+    }
+    const withStock: ProductColorWithStockDto[] = colors.map((c) => ({
+      ...this.toProductColorDto(c),
+      stock: (stockByVariantId.get(String(c._id)) ?? []).map((s) =>
+        this.toVariantStockDto(s),
+      ),
+    }));
     return {
       product: this.toProductDto(product),
       colors: withStock,
@@ -144,15 +195,19 @@ export class CatalogService implements ICatalogApiService {
     this.assertDb();
     const cat = await this.categoryRepository.findById(body.categoryId);
     if (!cat) throw new BadRequestError("Invalid categoryId");
+    const delivery = normalizeDeliveryForWrite(body);
     const row = await this.productRepository.create({
       categoryId: new mongoose.Types.ObjectId(body.categoryId),
       name: body.name,
       description: body.description,
       occasions: body.occasions,
       fabric: body.fabric,
-      basePrice: body.basePrice,
+      mrp: body.mrp,
+      sellingPrice: body.sellingPrice,
       currency: body.currency,
       allowedSizes: body.allowedSizes,
+      freeDelivery: delivery.freeDelivery,
+      deliveryCharge: delivery.deliveryCharge,
       active: body.active,
       sortOrder: body.sortOrder,
     });
@@ -168,15 +223,19 @@ export class CatalogService implements ICatalogApiService {
 
     let productId: string | null = null;
     try {
+      const delivery = normalizeDeliveryForWrite(body);
       const product = await this.productRepository.create({
         categoryId: new mongoose.Types.ObjectId(body.categoryId),
         name: body.name,
         description: body.description,
         occasions: body.occasions,
         fabric: body.fabric,
-        basePrice: body.basePrice,
+        mrp: body.mrp,
+        sellingPrice: body.sellingPrice,
         currency: body.currency,
         allowedSizes: body.allowedSizes,
+        freeDelivery: delivery.freeDelivery,
+        deliveryCharge: delivery.deliveryCharge,
         active: body.active,
         sortOrder: body.sortOrder,
       });
@@ -188,7 +247,7 @@ export class CatalogService implements ICatalogApiService {
         const row = await this.productColorRepository.create({
           productId: new mongoose.Types.ObjectId(productId),
           colorName: col.colorName,
-          colorNameEn: col.colorNameEn,
+          hexCode: col.hexCode,
           imageUrl: col.imageUrl,
           active: col.active,
           sortOrder: i,
@@ -256,9 +315,34 @@ export class CatalogService implements ICatalogApiService {
     if (body.description !== undefined) patch.description = body.description;
     if (body.occasions !== undefined) patch.occasions = body.occasions;
     if (body.fabric !== undefined) patch.fabric = body.fabric;
-    if (body.basePrice !== undefined) patch.basePrice = body.basePrice;
+    if (body.mrp !== undefined) patch.mrp = body.mrp;
+    if (body.sellingPrice !== undefined) patch.sellingPrice = body.sellingPrice;
+    if (body.mrp !== undefined || body.sellingPrice !== undefined) {
+      const existing = await this.productRepository.findById(productId);
+      const resolved = resolveProductPricing({
+        ...(existing ?? {}),
+        ...patch,
+      } as ProductLean);
+      patch.mrp = resolved.mrp;
+      patch.sellingPrice = resolved.sellingPrice;
+    }
     if (body.currency !== undefined) patch.currency = body.currency;
     if (body.allowedSizes !== undefined) patch.allowedSizes = body.allowedSizes;
+    if (body.freeDelivery !== undefined || body.deliveryCharge !== undefined) {
+      const existing = await this.productRepository.findById(productId);
+      const delivery = normalizeDeliveryForWrite({
+        freeDelivery:
+          body.freeDelivery ??
+          (body.deliveryCharge !== undefined
+            ? body.deliveryCharge === 0
+            : existing?.freeDelivery),
+        deliveryCharge:
+          body.deliveryCharge ??
+          (existing?.freeDelivery ? 0 : existing?.deliveryCharge),
+      });
+      patch.freeDelivery = delivery.freeDelivery;
+      patch.deliveryCharge = delivery.deliveryCharge;
+    }
     if (body.active !== undefined) patch.active = body.active;
     if (body.sortOrder !== undefined) patch.sortOrder = body.sortOrder;
     const row = await this.productRepository.updateById(productId, patch);
@@ -293,7 +377,7 @@ export class CatalogService implements ICatalogApiService {
     const row = await this.productColorRepository.create({
       productId: new mongoose.Types.ObjectId(productId),
       colorName: body.colorName,
-      colorNameEn: body.colorNameEn,
+      hexCode: body.hexCode,
       imageUrl: body.imageUrl,
       active: body.active,
       sortOrder: body.sortOrder,
@@ -403,6 +487,7 @@ export class CatalogService implements ICatalogApiService {
   }
 
   private toProductDto(r: ProductLean): ProductDto {
+    const { mrp, sellingPrice } = resolveProductPricing(r);
     return {
       id: String(r._id),
       categoryId: String(r.categoryId),
@@ -410,9 +495,14 @@ export class CatalogService implements ICatalogApiService {
       description: r.description ?? "",
       occasions: r.occasions ?? [],
       fabric: r.fabric ?? "",
-      basePrice: r.basePrice,
+      mrp,
+      sellingPrice,
       currency: r.currency ?? "NPR",
       allowedSizes: r.allowedSizes ?? [],
+      freeDelivery: r.freeDelivery ?? false,
+      deliveryCharge: r.freeDelivery
+        ? 0
+        : (r.deliveryCharge ?? SHOP_DELIVERY_CHARGE_NPR),
       active: r.active ?? true,
       sortOrder: r.sortOrder ?? 0,
       createdAt: iso(r.createdAt),
@@ -425,7 +515,7 @@ export class CatalogService implements ICatalogApiService {
       id: String(r._id),
       productId: String(r.productId),
       colorName: r.colorName,
-      colorNameEn: r.colorNameEn ?? "",
+      hexCode: r.hexCode ?? "#888888",
       imageUrl: r.imageUrl,
       active: r.active ?? true,
       sortOrder: r.sortOrder ?? 0,

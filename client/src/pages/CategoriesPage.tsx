@@ -30,10 +30,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-function shortId(id: string): string {
-  return id.length > 8 ? `${id.slice(0, 8)}…` : id;
-}
-
 export default function CategoriesPage() {
   const qc = useQueryClient();
   const { data: categories = [], isLoading, error } = useQuery({
@@ -101,15 +97,11 @@ export default function CategoriesPage() {
   });
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Categories
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Manage catalogue categories used by products. Each row is identified by
-            its id (MongoDB ObjectId).
+          <p className="font-body text-sm text-muted-foreground">
+            Manage catalogue categories used by products.
           </p>
         </div>
         <Button onClick={openCreate} className="gap-2 shrink-0">
@@ -139,20 +131,11 @@ export default function CategoriesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12 text-center">#</TableHead>
                     <TableHead>Name</TableHead>
-                    <TableHead className="hidden md:table-cell font-mono text-xs">
-                      Id
-                    </TableHead>
-                    <TableHead
-                      className="hidden md:table-cell"
-                      title="Assigned automatically on create"
-                    >
-                      Order
-                    </TableHead>
+                    <TableHead title="Assigned automatically on create">Order</TableHead>
                     <TableHead>Active</TableHead>
-                    <TableHead className="w-[100px] text-right">
-                      Actions
-                    </TableHead>
+                    <TableHead className="w-[100px] text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -166,18 +149,13 @@ export default function CategoriesPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    categories.map((c) => (
+                    categories.map((c, index) => (
                       <TableRow key={c.id}>
+                        <TableCell className="text-center text-muted-foreground tabular-nums">
+                          {index + 1}
+                        </TableCell>
                         <TableCell className="font-medium">{c.name}</TableCell>
-                        <TableCell
-                          className="hidden md:table-cell text-muted-foreground font-mono text-xs"
-                          title={c.id}
-                        >
-                          {shortId(c.id)}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {c.sortOrder}
-                        </TableCell>
+                        <TableCell>{c.sortOrder}</TableCell>
                         <TableCell>{c.active ? "Yes" : "No"}</TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button

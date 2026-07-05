@@ -12,7 +12,13 @@ const productColorSchema = new Schema(
       index: true,
     },
     colorName: { type: String, required: true, trim: true },
-    colorNameEn: { type: String, default: "", trim: true },
+    /** Display swatch on storefront (e.g. #7b1fa2). */
+    hexCode: {
+      type: String,
+      required: true,
+      trim: true,
+      match: /^#[0-9A-Fa-f]{6}$/,
+    },
     /** Single canonical image for this color (WhatsApp `image.link` / dashboard). */
     imageUrl: { type: String, required: true, trim: true },
     active: { type: Boolean, default: true },

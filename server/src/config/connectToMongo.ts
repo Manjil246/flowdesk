@@ -25,6 +25,9 @@ export class MongoDB {
       console.warn("⚠️ MONGODB_URI not set — skipping MongoDB connect");
       return;
     }
+    if (mongoose.connection.readyState === 1) {
+      return;
+    }
     try {
       await mongoose.connect(MONGODB_URI);
       console.log("✅ Connected to MongoDB");
@@ -48,6 +51,9 @@ export class MongoDB {
       });
     } catch (error) {
       console.error("❌ Failed to connect to MongoDB:", error);
+      if (process.env.VERCEL) {
+        throw error;
+      }
       process.exit(1);
     }
   }

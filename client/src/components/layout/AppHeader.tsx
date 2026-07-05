@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Bell, Menu, ChevronDown, LogOut, User, Lock, X } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AppHeaderProps {
   title: string;
@@ -18,12 +19,22 @@ const notifications = [
 
 export default function AppHeader({ title, onMenuClick }: AppHeaderProps) {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [showNotif, setShowNotif] = useState(false);
   const [showBotStatus, setShowBotStatus] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [unreadCount, setUnreadCount] = useState(3);
   const [botActive, setBotActive] = useState(true);
+
+  const displayEmail = user?.email ?? "Admin";
+  const initials = displayEmail.slice(0, 2).toUpperCase();
+
+  const handleLogout = async () => {
+    setShowLogoutConfirm(false);
+    await logout();
+    navigate("/admin/login");
+  };
 
   const notifRef = useRef<HTMLDivElement>(null);
   const botRef = useRef<HTMLDivElement>(null);
@@ -41,12 +52,22 @@ export default function AppHeader({ title, onMenuClick }: AppHeaderProps) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:px-6" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-        <div className="flex items-center gap-3">
-          <button className="rounded-md p-2 text-muted-foreground hover:bg-muted lg:hidden" onClick={onMenuClick}>
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card/95 px-4 backdrop-blur-sm lg:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            className="rounded-sm p-2 text-muted-foreground hover:bg-secondary lg:hidden"
+            onClick={onMenuClick}
+            aria-label="Open menu"
+          >
             <Menu className="h-5 w-5" />
           </button>
-          <h2 className="text-2xl font-bold text-foreground">{title}</h2>
+          <div className="min-w-0">
+            <p className="admin-kicker">
+              StyleSutra Admin
+            </p>
+            <h2 className="admin-display-title truncate text-2xl leading-tight lg:text-3xl">{title}</h2>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -54,21 +75,21 @@ export default function AppHeader({ title, onMenuClick }: AppHeaderProps) {
           <div className="relative" ref={botRef}>
             <button
               onClick={() => setShowBotStatus(!showBotStatus)}
-              className="hidden items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary sm:flex hover:bg-primary/15 transition-colors"
+              className="hidden items-center gap-2 rounded-sm border border-border bg-secondary px-3 py-1.5 font-body text-[10px] font-semibold uppercase tracking-[1px] text-accent-foreground sm:flex hover:bg-surface transition-colors"
             >
-              <span className={`h-2 w-2 rounded-full ${botActive ? "bg-primary animate-pulse-dot" : "bg-destructive"}`} />
+              <span className={`h-2 w-2 rounded-full ${botActive ? "bg-accent-foreground animate-pulse-dot" : "bg-destructive"}`} />
               {botActive ? "Bot Active" : "Bot Inactive"}
               <ChevronDown className="h-3 w-3" />
             </button>
             {showBotStatus && (
-              <div className="absolute right-0 top-full mt-2 w-56 rounded-lg border border-border bg-card p-4 card-shadow modal-scale-in z-50">
+              <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-sm border border-border bg-card p-4 card-shadow modal-scale-in">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className={`h-3 w-3 rounded-full ${botActive ? "bg-primary" : "bg-destructive"}`} />
+                  <span className={`h-3 w-3 rounded-full ${botActive ? "bg-accent-foreground" : "bg-destructive"}`} />
                   <span className="text-sm font-medium text-foreground">{botActive ? "Bot is Active" : "Bot is Inactive"}</span>
                 </div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-muted-foreground">Toggle bot</span>
-                  <button onClick={() => { setBotActive(!botActive); toast.success(botActive ? "Bot deactivated" : "Bot activated"); }} className={`relative h-6 w-10 rounded-full transition-colors ${botActive ? "bg-primary" : "bg-muted"}`}>
+                  <button onClick={() => { setBotActive(!botActive); toast.success(botActive ? "Bot deactivated" : "Bot activated"); }} className={`relative h-6 w-10 rounded-full transition-colors ${botActive ? "bg-accent-foreground" : "bg-muted"}`}>
                     <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-card shadow-sm transition-transform ${botActive ? "left-[18px]" : "left-0.5"}`} />
                   </button>
                 </div>
@@ -79,7 +100,7 @@ export default function AppHeader({ title, onMenuClick }: AppHeaderProps) {
 
           {/* Notification bell */}
           <div className="relative" ref={notifRef}>
-            <button onClick={() => setShowNotif(!showNotif)} className="relative rounded-full p-2 text-muted-foreground hover:bg-muted">
+            <button onClick={() => setShowNotif(!showNotif)} className="relative rounded-sm p-2 text-muted-foreground hover:bg-secondary">
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground animate-badge-pulse">
@@ -88,10 +109,10 @@ export default function AppHeader({ title, onMenuClick }: AppHeaderProps) {
               )}
             </button>
             {showNotif && (
-              <div className="absolute right-0 top-full mt-2 w-80 rounded-lg border border-border bg-card card-shadow modal-scale-in z-50">
+              <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-sm border border-border bg-card card-shadow modal-scale-in">
                 <div className="flex items-center justify-between border-b border-border px-4 py-3">
                   <span className="text-sm font-semibold text-foreground">Notifications</span>
-                  <button onClick={() => { setUnreadCount(0); toast.success("All notifications marked as read"); }} className="text-xs text-primary hover:underline">Mark all as read</button>
+                  <button onClick={() => { setUnreadCount(0); toast.success("All notifications marked as read"); }} className="text-xs text-accent-foreground hover:underline">Mark all as read</button>
                 </div>
                 <div className="max-h-72 overflow-y-auto custom-scrollbar">
                   {notifications.map((n, i) => (
@@ -105,7 +126,7 @@ export default function AppHeader({ title, onMenuClick }: AppHeaderProps) {
                   ))}
                 </div>
                 <div className="border-t border-border px-4 py-2.5 text-center">
-                  <button onClick={() => toast.info("All notifications view coming soon")} className="text-xs text-primary hover:underline">View all notifications</button>
+                  <button onClick={() => toast.info("All notifications view coming soon")} className="text-xs text-accent-foreground hover:underline">View all notifications</button>
                 </div>
               </div>
             )}
@@ -113,16 +134,16 @@ export default function AppHeader({ title, onMenuClick }: AppHeaderProps) {
 
           {/* Avatar */}
           <div className="relative" ref={profileRef}>
-            <button onClick={() => setShowProfile(!showProfile)} className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground hover:ring-2 hover:ring-primary/30 transition-all">
-              AD
+            <button onClick={() => setShowProfile(!showProfile)} className="flex h-9 w-9 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-primary-foreground hover:ring-2 hover:ring-ring/30 transition-all">
+              {initials}
             </button>
             {showProfile && (
-              <div className="absolute right-0 top-full mt-2 w-56 rounded-lg border border-border bg-card card-shadow modal-scale-in z-50">
+              <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-sm border border-border bg-card card-shadow modal-scale-in">
                 <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">AD</div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-primary-foreground">{initials}</div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">Admin User</p>
-                    <p className="text-xs text-muted-foreground truncate">admin@flowdesk.com</p>
+                    <p className="text-sm font-medium text-foreground truncate">Admin</p>
+                    <p className="text-xs text-muted-foreground truncate">{displayEmail}</p>
                   </div>
                 </div>
                 <div className="py-1">
@@ -146,15 +167,15 @@ export default function AppHeader({ title, onMenuClick }: AppHeaderProps) {
       {/* Logout Confirmation Modal */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-60 flex items-center justify-center bg-foreground/25 backdrop-blur-sm p-4" onClick={() => setShowLogoutConfirm(false)}>
-          <div className="w-full max-w-sm rounded-lg bg-card p-6 card-shadow modal-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm rounded-sm border border-border bg-card p-6 card-shadow modal-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-foreground">Confirm Logout</h3>
+              <h3 className="admin-display-title text-xl">Confirm logout</h3>
               <button onClick={() => setShowLogoutConfirm(false)} className="rounded-full p-1.5 hover:bg-muted"><X className="h-5 w-5" /></button>
             </div>
             <p className="text-sm text-muted-foreground mb-6">Are you sure you want to logout?</p>
             <div className="flex gap-3">
-              <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">Cancel</button>
-              <button onClick={() => { setShowLogoutConfirm(false); navigate("/admin/login"); }} className="flex-1 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors">Logout</button>
+              <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 rounded-sm border border-border px-4 py-2.5 font-body text-[11px] font-semibold uppercase tracking-[1px] text-muted-foreground hover:bg-secondary transition-colors">Cancel</button>
+              <button onClick={() => void handleLogout()} className="flex-1 rounded-sm bg-destructive px-4 py-2.5 font-body text-[11px] font-semibold uppercase tracking-[1px] text-destructive-foreground hover:bg-destructive/90 transition-colors">Logout</button>
             </div>
           </div>
         </div>

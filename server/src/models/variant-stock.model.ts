@@ -20,7 +20,7 @@ const variantStockSchema = new Schema(
       index: true,
     },
     size: { type: String, required: true, trim: true },
-    /** NPR (or product currency) for this size×color; null = inherit product `basePrice` in APIs. */
+    /** NPR (or product currency) for this size×color; null = inherit product `sellingPrice` in APIs. */
     price: { type: Number, default: null, min: 0 },
     stock: { type: Number, required: true, default: 0, min: 0 },
     isAvailable: { type: Boolean, required: true, default: true },

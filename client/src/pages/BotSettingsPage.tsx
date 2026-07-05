@@ -32,8 +32,8 @@ const defaultRules: Rule[] = [
 
 export default function BotSettingsPage() {
   const [botActive, setBotActive] = useState(true);
-  const [botName, setBotName] = useState("FlowDesk");
-  const [welcomeMsg, setWelcomeMsg] = useState("Hello! 👋 Welcome to FlowDesk. I'm your AI assistant. How can I help you today?");
+  const [botName, setBotName] = useState("StyleSutra");
+  const [welcomeMsg, setWelcomeMsg] = useState("Hello! 👋 Welcome to StyleSutra. I'm your assistant. How can I help you today?");
   const [fallbackMsg, setFallbackMsg] = useState("I'm sorry, I didn't understand that. Let me connect you with a human agent.");
   const [language, setLanguage] = useState("English");
   const [steps, setSteps] = useState<Step[]>(defaultSteps);
@@ -115,7 +115,7 @@ export default function BotSettingsPage() {
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-4xl">
+    <div className="p-4 lg:p-6 space-y-6 max-w-4xl mx-auto">
       {/* Bot Status */}
       <div className="rounded-lg border border-border bg-card p-5 card-shadow">
         <div className="flex items-center justify-between">

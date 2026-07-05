@@ -7,7 +7,7 @@ import {
 } from "recharts";
 
 const stats = [
-  { title: "Total Leads", value: "248", subtitle: "+12 this week", icon: Users, color: "text-primary", bgColor: "bg-primary/10", trend: "up", gradient: "from-white to-[#F0FFF4]", borderColor: "border-l-primary" },
+  { title: "Total Leads", value: "248", subtitle: "+12 this week", icon: Users, color: "text-accent-foreground", bgColor: "bg-secondary", trend: "up", gradient: "from-white to-surface", borderColor: "border-l-accent-foreground" },
   { title: "Active Conversations", value: "43", subtitle: "Right now", icon: MessageSquare, color: "text-info", bgColor: "bg-info/10", pulse: true, gradient: "from-white to-[#EFF6FF]", borderColor: "border-l-info" },
   { title: "Messages Sent Today", value: "1,204", subtitle: "Across all campaigns", icon: Send, color: "text-purple-500", bgColor: "bg-purple-500/10", gradient: "from-white to-[#FAF5FF]", borderColor: "border-l-purple-500" },
   { title: "Bot Response Rate", value: "94.2%", subtitle: "Last 7 days", icon: Bot, color: "text-warning", bgColor: "bg-warning/10", gradient: "from-white to-[#FFF7ED]", borderColor: "border-l-warning" },

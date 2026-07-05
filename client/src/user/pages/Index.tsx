@@ -2,9 +2,9 @@ import AnnouncementBar from '@/user/components/AnnouncementBar';
 import Navbar from '@/user/components/Navbar';
 import HeroSection from '@/user/components/HeroSection';
 import MarqueeTicker from '@/user/components/MarqueeTicker';
-import CategorySection from '@/user/components/CategorySection';
 import LookbookSection from '@/user/components/LookbookSection';
 import FeaturesStrip from '@/user/components/FeaturesStrip';
+import ThankYouCardSection from '@/user/components/ThankYouCardSection';
 import TestimonialsSection from '@/user/components/TestimonialsSection';
 import NewsletterSection from '@/user/components/NewsletterSection';
 import Footer from '@/user/components/Footer';
@@ -16,9 +16,9 @@ export default function Index() {
       <Navbar />
       <HeroSection />
       <MarqueeTicker />
-      <CategorySection />
       <LookbookSection />
       <FeaturesStrip />
+      <ThankYouCardSection />
       <TestimonialsSection />
       <NewsletterSection />
       <Footer />

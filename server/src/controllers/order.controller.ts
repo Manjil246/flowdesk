@@ -6,6 +6,7 @@ import {
 } from "../errors/service.errors";
 import type { ShopOrderService } from "../services/shop-order.service";
 import type {
+  CreateAdminOrderBody,
   OrderIdParams,
   OrderListQuery,
   OrderPatchBody,
@@ -73,6 +74,25 @@ export class OrderController {
       }
       console.error("[orders] patch", e);
       res.status(500).json({ error: "Failed to update order" });
+    }
+  };
+
+  createOrder = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const body = req.body as CreateAdminOrderBody;
+      const order = await this.shopOrderService.createFromAdmin(body);
+      res.status(201).json({ order });
+    } catch (e) {
+      if (e instanceof DbNotReadyError) {
+        res.status(503).json({ error: e.message });
+        return;
+      }
+      if (e instanceof BadRequestError) {
+        res.status(400).json({ error: e.message });
+        return;
+      }
+      console.error("[orders] create", e);
+      res.status(500).json({ error: "Failed to create order" });
     }
   };
 }

@@ -10,7 +10,7 @@ const numberedProductSchema = new Schema(
     n: { type: Number, required: true },
     id: { type: String, required: true },
     name: { type: String, required: true },
-    basePrice: { type: Number, required: true },
+    sellingPrice: { type: Number, required: true },
   },
   { _id: false },
 );
@@ -32,7 +32,7 @@ const productDetailSnapshotSchema = new Schema(
     description: { type: String, default: "" },
     fabric: { type: String, default: "" },
     occasions: { type: [String], default: [] },
-    basePrice: { type: Number, required: true },
+    sellingPrice: { type: Number, required: true },
     currency: { type: String, default: "NPR" },
     sizes: { type: [String], default: [] },
     colors: { type: [numberedColorSchema], default: [] },

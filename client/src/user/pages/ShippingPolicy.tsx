@@ -23,13 +23,11 @@ export default function ShippingPolicy() {
             </section>
 
             <section>
-              <h2 className="font-display text-xl text-foreground mb-3">Shipping Rates</h2>
-              <p>A flat delivery charge of <strong className="text-foreground">रू 150</strong> applies to all orders across Nepal — no thresholds, no surprises at checkout.</p>
-            </section>
-
-            <section>
-              <h2 className="font-display text-xl text-foreground mb-3">Cash on Delivery</h2>
-              <p>COD is available across most locations in Nepal. An additional handling charge of <strong className="text-foreground">रू 50</strong> applies to COD orders. COD is not available for orders above रू 25,000.</p>
+              <h2 className="font-display text-xl text-foreground mb-3">Delivery Charges</h2>
+              <p>
+                Delivery fees are set <strong className="text-foreground">per product</strong> — not as a flat site-wide rate.
+                Some items include free delivery; others show a specific charge on the product page and in your cart at checkout.
+              </p>
             </section>
 
             <section>
@@ -45,23 +43,21 @@ export default function ShippingPolicy() {
                     <tr className="border-b border-border">
                       <th className="py-2 px-3 text-left font-body text-[11px] uppercase tracking-[1px] text-muted-foreground">Province</th>
                       <th className="py-2 px-3 text-left font-body text-[11px] uppercase tracking-[1px] text-muted-foreground">Est. Delivery</th>
-                      <th className="py-2 px-3 text-left font-body text-[11px] uppercase tracking-[1px] text-muted-foreground">COD</th>
                     </tr>
                   </thead>
                   <tbody className="font-body text-sm text-muted-foreground">
                     {[
-                      ['Bagmati', '2–4 days', 'Yes'],
-                      ['Gandaki', '4–6 days', 'Yes'],
-                      ['Lumbini', '5–7 days', 'Yes'],
-                      ['Koshi', '5–7 days', 'Yes'],
-                      ['Madhesh', '4–6 days', 'Yes'],
-                      ['Karnali', '7–10 days', 'Limited'],
-                      ['Sudurpashchim', '7–10 days', 'Limited'],
-                    ].map(([prov, delivery, cod]) => (
+                      ['Bagmati', '2–4 days'],
+                      ['Gandaki', '4–6 days'],
+                      ['Lumbini', '5–7 days'],
+                      ['Koshi', '5–7 days'],
+                      ['Madhesh', '4–6 days'],
+                      ['Karnali', '7–10 days'],
+                      ['Sudurpashchim', '7–10 days'],
+                    ].map(([prov, delivery]) => (
                       <tr key={prov} className="border-b border-border">
                         <td className="py-2 px-3">{prov}</td>
                         <td className="py-2 px-3">{delivery}</td>
-                        <td className="py-2 px-3">{cod}</td>
                       </tr>
                     ))}
                   </tbody>

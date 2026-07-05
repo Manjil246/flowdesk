@@ -54,6 +54,21 @@ export const productListQuerySchema = z.object({
 
 export type ProductListQuery = z.infer<typeof productListQuerySchema>;
 
+/** Lightweight product list for admin pickers (defaults to active only). */
+export const productPickerQuerySchema = z.object({
+  categoryId: objectIdParam.optional(),
+  active: z
+    .enum(["true", "false", "all"])
+    .optional()
+    .default("true")
+    .transform((v) => (v === "all" ? undefined : v === "true")),
+  search: z.string().trim().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(200),
+  skip: z.coerce.number().int().min(0).default(0),
+});
+
+export type ProductPickerQuery = z.infer<typeof productPickerQuerySchema>;
+
 export const productIdParamsSchema = z.object({
   productId: objectIdParam,
 });
@@ -69,18 +84,64 @@ export type ProductColorParams = z.infer<typeof productColorParamsSchema>;
 
 const sizeString = z.string().trim().min(1).max(32);
 
-export const productCreateBodySchema = z.object({
-  categoryId: objectIdParam,
-  name: z.string().trim().min(1).max(300),
-  description: z.string().max(10000).optional().default(""),
-  occasions: z.array(z.string().trim().max(80)).max(50).optional().default([]),
-  fabric: z.string().trim().max(200).optional().default(""),
-  basePrice: z.coerce.number().min(0).max(1e9),
-  currency: z.string().trim().min(1).max(10).optional().default("NPR"),
-  allowedSizes: z.array(sizeString).max(50).optional().default([]),
-  active: z.boolean().optional().default(true),
-  sortOrder: z.coerce.number().int().min(0).max(1_000_000).optional().default(0),
-});
+export const hexCodeSchema = z
+  .string()
+  .trim()
+  .regex(/^#[0-9A-Fa-f]{6}$/, "Hex color must be in #RRGGBB format");
+
+const deliveryFieldsSchema = {
+  freeDelivery: z.boolean().optional().default(false),
+  deliveryCharge: z.coerce.number().min(0).max(1e9).optional().default(150),
+};
+
+function refineDeliveryFields(
+  data: { freeDelivery?: boolean; deliveryCharge?: number },
+  ctx: z.RefinementCtx,
+): void {
+  if (data.freeDelivery) return;
+  const charge = data.deliveryCharge ?? 150;
+  if (charge <= 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["deliveryCharge"],
+      message: "Enter a delivery charge greater than 0, or select free delivery",
+    });
+  }
+}
+
+function refineProductPricing(
+  data: { mrp?: number; sellingPrice?: number },
+  ctx: z.RefinementCtx,
+): void {
+  if (data.mrp == null || data.sellingPrice == null) return;
+  if (data.sellingPrice > data.mrp) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["sellingPrice"],
+      message: "Selling price cannot be higher than MRP",
+    });
+  }
+}
+
+export const productCreateBodySchema = z
+  .object({
+    categoryId: objectIdParam,
+    name: z.string().trim().min(1).max(300),
+    description: z.string().max(10000).optional().default(""),
+    occasions: z.array(z.string().trim().max(80)).max(50).optional().default([]),
+    fabric: z.string().trim().max(200).optional().default(""),
+    mrp: z.coerce.number().min(0).max(1e9),
+    sellingPrice: z.coerce.number().min(0).max(1e9),
+    currency: z.string().trim().min(1).max(10).optional().default("NPR"),
+    allowedSizes: z.array(sizeString).max(50).optional().default([]),
+    ...deliveryFieldsSchema,
+    active: z.boolean().optional().default(true),
+    sortOrder: z.coerce.number().int().min(0).max(1_000_000).optional().default(0),
+  })
+  .superRefine((data, ctx) => {
+    refineDeliveryFields(data, ctx);
+    refineProductPricing(data, ctx);
+  });
 
 export type ProductCreateBody = z.infer<typeof productCreateBodySchema>;
 
@@ -91,19 +152,41 @@ export const productPatchBodySchema = z
     description: z.string().max(10000).optional(),
     occasions: z.array(z.string().trim().max(80)).max(50).optional(),
     fabric: z.string().trim().max(200).optional(),
-    basePrice: z.coerce.number().min(0).max(1e9).optional(),
+    mrp: z.coerce.number().min(0).max(1e9).optional(),
+    sellingPrice: z.coerce.number().min(0).max(1e9).optional(),
     currency: z.string().trim().min(1).max(10).optional(),
     allowedSizes: z.array(sizeString).max(50).optional(),
+    freeDelivery: z.boolean().optional(),
+    deliveryCharge: z.coerce.number().min(0).max(1e9).optional(),
     active: z.boolean().optional(),
     sortOrder: z.coerce.number().int().min(0).max(1_000_000).optional(),
   })
-  .refine((o) => Object.keys(o).length > 0, { message: "At least one field required" });
+  .refine((o) => Object.keys(o).length > 0, { message: "At least one field required" })
+  .superRefine((data, ctx) => {
+    if (data.freeDelivery === undefined && data.deliveryCharge === undefined) {
+      // delivery optional on patch
+    } else {
+      refineDeliveryFields(
+        {
+          freeDelivery: data.freeDelivery ?? data.deliveryCharge === 0,
+          deliveryCharge: data.deliveryCharge,
+        },
+        ctx,
+      );
+    }
+    if (data.mrp !== undefined || data.sellingPrice !== undefined) {
+      refineProductPricing(
+        { mrp: data.mrp, sellingPrice: data.sellingPrice },
+        ctx,
+      );
+    }
+  });
 
 export type ProductPatchBody = z.infer<typeof productPatchBodySchema>;
 
 export const productColorCreateBodySchema = z.object({
   colorName: z.string().trim().min(1).max(200),
-  colorNameEn: z.string().trim().max(200).optional().default(""),
+  hexCode: hexCodeSchema,
   imageUrl: z.string().trim().min(1).max(2000),
   active: z.boolean().optional().default(true),
   sortOrder: z.coerce.number().int().min(0).max(1_000_000).optional().default(0),
@@ -114,7 +197,7 @@ export type ProductColorCreateBody = z.infer<typeof productColorCreateBodySchema
 export const productColorPatchBodySchema = z
   .object({
     colorName: z.string().trim().min(1).max(200).optional(),
-    colorNameEn: z.string().trim().max(200).optional(),
+    hexCode: hexCodeSchema.optional(),
     imageUrl: z.string().trim().min(1).max(2000).optional(),
     active: z.boolean().optional(),
     sortOrder: z.coerce.number().int().min(0).max(1_000_000).optional(),
@@ -146,7 +229,7 @@ const colorClientKey = z.string().uuid();
 export const productColorDraftSchema = z.object({
   clientKey: colorClientKey,
   colorName: z.string().trim().min(1).max(200),
-  colorNameEn: z.string().trim().max(200).optional().default(""),
+  hexCode: hexCodeSchema,
   imageUrl: z.string().trim().min(1).max(2000),
   active: z.boolean().optional().default(true),
 });
@@ -158,9 +241,11 @@ export const productCreateFullBodySchema = z
     description: z.string().max(10000).optional().default(""),
     occasions: z.array(z.string().trim().max(80)).max(50).optional().default([]),
     fabric: z.string().trim().max(200).optional().default(""),
-    basePrice: z.coerce.number().min(0).max(1e9),
+    mrp: z.coerce.number().min(0).max(1e9),
+    sellingPrice: z.coerce.number().min(0).max(1e9),
     currency: z.string().trim().min(1).max(10).optional().default("NPR"),
     allowedSizes: z.array(sizeString).min(1).max(50),
+    ...deliveryFieldsSchema,
     active: z.boolean().optional().default(true),
     sortOrder: z.coerce.number().int().min(0).max(1_000_000).optional().default(0),
     colors: z.array(productColorDraftSchema).min(1).max(40),
@@ -181,6 +266,10 @@ export const productCreateFullBodySchema = z
       .max(500),
   })
   .superRefine((data, ctx) => {
+    refineDeliveryFields(data, ctx);
+    if (ctx.issues.length > 0) return;
+    refineProductPricing(data, ctx);
+    if (ctx.issues.length > 0) return;
     const sizeSet = new Set(data.allowedSizes);
     if (sizeSet.size !== data.allowedSizes.length) {
       ctx.addIssue({

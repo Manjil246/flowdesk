@@ -1,5 +1,7 @@
-const base = () =>
-  (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+import { adminFetch } from "@/lib/api/admin-fetch";
+import { apiBaseUrl } from "@/lib/api/base";
+
+const base = apiBaseUrl;
 
 async function parseErr(res: Response): Promise<string> {
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -34,9 +36,12 @@ export type ProductDto = {
   description: string;
   occasions: string[];
   fabric: string;
-  basePrice: number;
+  mrp: number;
+  sellingPrice: number;
   currency: string;
   allowedSizes: string[];
+  freeDelivery: boolean;
+  deliveryCharge: number;
   active: boolean;
   sortOrder: number;
   createdAt: string | null;
@@ -47,12 +52,17 @@ export type ProductColorDto = {
   id: string;
   productId: string;
   colorName: string;
-  colorNameEn: string;
+  hexCode: string;
   imageUrl: string;
   active: boolean;
   sortOrder: number;
   createdAt: string | null;
   updatedAt: string | null;
+};
+
+export type ColorPresetDto = {
+  name: string;
+  hexCode: string;
 };
 
 export type VariantStockDto = {
@@ -97,7 +107,7 @@ export async function createCategory(body: {
   description?: string;
   active?: boolean;
 }): Promise<CategoryDto> {
-  const res = await fetch(`${base()}/api/v1/categories`, {
+  const res = await adminFetch(`${base()}/api/v1/categories`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -115,7 +125,7 @@ export async function updateCategory(
     active: boolean;
   }>,
 ): Promise<CategoryDto> {
-  const res = await fetch(
+  const res = await adminFetch(
     `${base()}/api/v1/categories/${encodeURIComponent(id)}`,
     {
       method: "PATCH",
@@ -129,7 +139,7 @@ export async function updateCategory(
 }
 
 export async function deleteCategory(id: string): Promise<void> {
-  const res = await fetch(
+  const res = await adminFetch(
     `${base()}/api/v1/categories/${encodeURIComponent(id)}`,
     { method: "DELETE" },
   );
@@ -173,7 +183,7 @@ export type CloudinaryCatalogSignature = {
 };
 
 export async function fetchCloudinaryCatalogSignature(): Promise<CloudinaryCatalogSignature> {
-  const res = await fetch(
+  const res = await adminFetch(
     `${base()}/api/v1/uploads/cloudinary/catalog-image`,
     { method: "POST" },
   );
@@ -219,15 +229,18 @@ export type ProductCreateFullPayload = {
   description?: string;
   occasions?: string[];
   fabric?: string;
-  basePrice: number;
+  mrp: number;
+  sellingPrice: number;
   currency?: string;
   allowedSizes: string[];
+  freeDelivery?: boolean;
+  deliveryCharge?: number;
   active?: boolean;
   sortOrder?: number;
   colors: Array<{
     clientKey: string;
     colorName: string;
-    colorNameEn?: string;
+    hexCode: string;
     imageUrl: string;
     active?: boolean;
   }>;
@@ -243,10 +256,17 @@ export type ProductCreateFullPayload = {
   }>;
 };
 
+export async function fetchColorPresets(): Promise<ColorPresetDto[]> {
+  const res = await adminFetch(`${base()}/api/v1/products/color-presets`);
+  if (!res.ok) throw new Error(await parseErr(res));
+  const data = (await res.json()) as { presets: ColorPresetDto[] };
+  return data.presets ?? [];
+}
+
 export async function createProductFull(
   body: ProductCreateFullPayload,
 ): Promise<ProductDetailDto> {
-  const res = await fetch(`${base()}/api/v1/products/full`, {
+  const res = await adminFetch(`${base()}/api/v1/products/full`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -261,13 +281,16 @@ export async function createProduct(body: {
   description?: string;
   occasions?: string[];
   fabric?: string;
-  basePrice: number;
+  mrp: number;
+  sellingPrice: number;
   currency?: string;
   allowedSizes?: string[];
+  freeDelivery?: boolean;
+  deliveryCharge?: number;
   active?: boolean;
   sortOrder?: number;
 }): Promise<ProductDto> {
-  const res = await fetch(`${base()}/api/v1/products`, {
+  const res = await adminFetch(`${base()}/api/v1/products`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -285,14 +308,17 @@ export async function updateProduct(
     description: string;
     occasions: string[];
     fabric: string;
-    basePrice: number;
+    mrp: number;
+    sellingPrice: number;
     currency: string;
     allowedSizes: string[];
+    freeDelivery: boolean;
+    deliveryCharge: number;
     active: boolean;
     sortOrder: number;
   }>,
 ): Promise<ProductDto> {
-  const res = await fetch(
+  const res = await adminFetch(
     `${base()}/api/v1/products/${encodeURIComponent(id)}`,
     {
       method: "PATCH",
@@ -306,7 +332,7 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  const res = await fetch(`${base()}/api/v1/products/${encodeURIComponent(id)}`, {
+  const res = await adminFetch(`${base()}/api/v1/products/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(await parseErr(res));
@@ -316,7 +342,7 @@ export async function deleteProductColor(
   productId: string,
   colorId: string,
 ): Promise<void> {
-  const res = await fetch(
+  const res = await adminFetch(
     `${base()}/api/v1/products/${encodeURIComponent(productId)}/colors/${encodeURIComponent(colorId)}`,
     { method: "DELETE" },
   );
@@ -327,13 +353,13 @@ export async function createProductColor(
   productId: string,
   body: {
     colorName: string;
-    colorNameEn?: string;
+    hexCode: string;
     imageUrl: string;
     active?: boolean;
     sortOrder?: number;
   },
 ): Promise<ProductColorDto> {
-  const res = await fetch(
+  const res = await adminFetch(
     `${base()}/api/v1/products/${encodeURIComponent(productId)}/colors`,
     {
       method: "POST",
@@ -351,13 +377,13 @@ export async function updateProductColor(
   colorId: string,
   body: Partial<{
     colorName: string;
-    colorNameEn: string;
+    hexCode: string;
     imageUrl: string;
     active: boolean;
     sortOrder: number;
   }>,
 ): Promise<ProductColorDto> {
-  const res = await fetch(
+  const res = await adminFetch(
     `${base()}/api/v1/products/${encodeURIComponent(productId)}/colors/${encodeURIComponent(colorId)}`,
     {
       method: "PATCH",
@@ -383,7 +409,7 @@ export async function replaceVariantStock(
     active?: boolean;
   }>,
 ): Promise<VariantStockDto[]> {
-  const res = await fetch(
+  const res = await adminFetch(
     `${base()}/api/v1/products/${encodeURIComponent(productId)}/colors/${encodeURIComponent(colorId)}/stock`,
     {
       method: "PUT",

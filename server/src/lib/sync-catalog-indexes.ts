@@ -2,6 +2,7 @@ import { Category } from "../models/category.model";
 import { Product } from "../models/product.model";
 import { ProductColor } from "../models/product-color.model";
 import { VariantStock } from "../models/variant-stock.model";
+import { ContactInquiry } from "../models/contact-inquiry.model";
 
 /**
  * Aligns collection indexes with current Mongoose schemas (drops stale indexes
@@ -13,5 +14,9 @@ export async function syncCatalogModelIndexes(): Promise<void> {
     Product.syncIndexes(),
     ProductColor.syncIndexes(),
     VariantStock.syncIndexes(),
+    ContactInquiry.syncIndexes(),
   ]);
+
+  // Drop legacy fields removed from schemas.
+  await ProductColor.updateMany({}, { $unset: { colorNameEn: "" } });
 }

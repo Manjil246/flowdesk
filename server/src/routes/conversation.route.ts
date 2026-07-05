@@ -11,6 +11,7 @@ import {
   validateParams,
   validateQueryParams,
 } from "../middlewares/validationMiddleware";
+import { authenticate } from "../middlewares/auth.middleware";
 import {
   conversationIdParamsSchema,
   conversationListQuerySchema,
@@ -39,22 +40,26 @@ export class ConversationRoutes {
 
     this.router.get(
       "/",
+      authenticate,
       validateQueryParams(conversationListQuerySchema),
       this.conversationController.listConversations,
     );
     this.router.patch(
       "/:conversationId/read",
+      authenticate,
       validateParams(conversationIdParamsSchema),
       this.conversationController.markAsRead,
     );
     this.router.get(
       "/:conversationId/messages",
+      authenticate,
       validateParams(conversationIdParamsSchema),
       validateQueryParams(conversationMessagesQuerySchema),
       this.conversationController.getConversationMessages,
     );
     this.router.post(
       "/:conversationId/messages",
+      authenticate,
       validateParams(conversationIdParamsSchema),
       validateBody(conversationSendTextBodySchema),
       this.whatsAppController.sendText,

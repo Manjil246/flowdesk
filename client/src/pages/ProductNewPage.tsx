@@ -6,9 +6,18 @@ import { toast } from "sonner";
 import {
   createProductFull,
   fetchCategories,
+  fetchColorPresets,
   uploadCatalogImageToCloudinary,
 } from "@/lib/api/catalog";
-import { Button } from "@/components/ui/button";
+import type { ColorPresetDto } from "@/lib/api/catalog";
+import { DEFAULT_SELECTED_SIZES, PRESET_SIZES } from "@/lib/product-sizes";
+import {
+  colorNameMatches,
+  isValidHexCode,
+  normalizeHexCode,
+} from "@/lib/color-utils";
+import { ColorVariantPicker } from "@/components/catalog/ColorVariantPicker";
+import { LockedColorDisplay } from "@/components/catalog/LockedColorDisplay";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Table,
   TableBody,
@@ -30,12 +40,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-const PRESET_SIZES = ["XS", "S", "M", "L", "XL", "XXL"] as const;
+const DEFAULT_DELIVERY_CHARGE = 150;
+const SAVE_REQUIRES_VARIANT_MSG =
+  "Please add at least one color variant to save the product.";
 
 type ColorDraft = {
   clientKey: string;
   colorName: string;
+  hexCode: string;
   imageUrl: string;
 };
 
@@ -45,10 +66,11 @@ type CellDraft = {
   isAvailable: boolean;
 };
 
-function newColor(): ColorDraft {
+function newColor(hexCode = "#888888"): ColorDraft {
   return {
     clientKey: crypto.randomUUID(),
     colorName: "",
+    hexCode,
     imageUrl: "",
   };
 }
@@ -62,17 +84,31 @@ export default function ProductNewPage() {
     queryFn: () => fetchCategories({ active: "all" }),
   });
 
+  const { data: colorPresets = [] } = useQuery({
+    queryKey: ["colorPresets"],
+    queryFn: fetchColorPresets,
+  });
+
   const [categoryId, setCategoryId] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [fabric, setFabric] = useState("");
-  const [basePrice, setBasePrice] = useState("0");
+  const [mrp, setMrp] = useState("0");
+  const [sellingPrice, setSellingPrice] = useState("0");
   const [currency, setCurrency] = useState("NPR");
-  const [sizes, setSizes] = useState<string[]>(["S", "M", "L"]);
+  const [sizes, setSizes] = useState<string[]>([...DEFAULT_SELECTED_SIZES]);
   const [customSize, setCustomSize] = useState("");
+  const [freeDelivery, setFreeDelivery] = useState(false);
+  const [deliveryCharge, setDeliveryCharge] = useState(
+    String(DEFAULT_DELIVERY_CHARGE),
+  );
   const [colors, setColors] = useState<ColorDraft[]>([]);
   const [cells, setCells] = useState<Record<string, CellDraft>>({});
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const [variantDialogOpen, setVariantDialogOpen] = useState(false);
+  const [variantColorName, setVariantColorName] = useState("");
+  const [variantHex, setVariantHex] = useState("#888888");
+  const [variantPresetActive, setVariantPresetActive] = useState(false);
 
   useEffect(() => {
     if (!categoryId && categories[0]?.id) {
@@ -84,9 +120,9 @@ export default function ProductNewPage() {
     setCells((prev) => {
       const next = { ...prev };
       const defaultPrice =
-        basePrice.trim() === "" || Number.isNaN(Number(basePrice))
+        sellingPrice.trim() === "" || Number.isNaN(Number(sellingPrice))
           ? "0"
-          : basePrice.trim();
+          : sellingPrice.trim();
       for (const c of colors) {
         for (const s of sizes) {
           const k = `${c.clientKey}::${s}`;
@@ -107,7 +143,7 @@ export default function ProductNewPage() {
       }
       return next;
     });
-  }, [colors, sizes, basePrice]);
+  }, [colors, sizes, sellingPrice]);
 
   const togglePresetSize = (sz: string) => {
     setSizes((prev) => {
@@ -150,23 +186,78 @@ export default function ProductNewPage() {
     });
   };
 
+  const openAddVariantDialog = () => {
+    setVariantColorName("");
+    setVariantHex("#888888");
+    setVariantPresetActive(false);
+    setVariantDialogOpen(true);
+  };
+
+  const selectVariantPreset = (preset: ColorPresetDto) => {
+    setVariantPresetActive(true);
+    setVariantColorName(preset.name);
+    setVariantHex(normalizeHexCode(preset.hexCode));
+  };
+
+  const confirmAddVariant = () => {
+    const name = variantColorName.trim();
+    if (!name) {
+      toast.error("Select a preset or enter a color name");
+      return;
+    }
+    if (!isValidHexCode(variantHex)) {
+      toast.error("Enter a valid hex color (#RRGGBB)");
+      return;
+    }
+    const hexCode = normalizeHexCode(variantHex);
+    if (colors.some((c) => colorNameMatches(c.colorName, name))) {
+      toast.message(`${name} is already added`);
+      return;
+    }
+    setColors((prev) => [
+      ...prev,
+      { ...newColor(hexCode), colorName: name, hexCode },
+    ]);
+    setVariantDialogOpen(false);
+    setVariantColorName("");
+    setVariantHex("#888888");
+    setVariantPresetActive(false);
+  };
+
+  const removeColor = (clientKey: string) => {
+    setColors((prev) => prev.filter((c) => c.clientKey !== clientKey));
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!categoryId) throw new Error("Select a category");
       if (!name.trim()) throw new Error("Product name is required");
-      const bp = Number(basePrice);
-      if (Number.isNaN(bp) || bp < 0) throw new Error("Invalid base price");
+      const mrpVal = Number(mrp);
+      const sp = Number(sellingPrice);
+      if (Number.isNaN(mrpVal) || mrpVal < 0) throw new Error("Invalid MRP");
+      if (Number.isNaN(sp) || sp < 0) throw new Error("Invalid selling price");
+      if (sp > mrpVal) throw new Error("Selling price cannot exceed MRP");
       if (sizes.length === 0) throw new Error("Add at least one size");
-      if (colors.length === 0) throw new Error("Add at least one color");
+      if (colors.length === 0) throw new Error(SAVE_REQUIRES_VARIANT_MSG);
+      let deliveryAmount = 0;
+      if (!freeDelivery) {
+        deliveryAmount = Number(deliveryCharge);
+        if (Number.isNaN(deliveryAmount) || deliveryAmount <= 0) {
+          throw new Error("Enter a delivery charge greater than 0, or select free delivery");
+        }
+      }
       for (const c of colors) {
         if (!c.colorName.trim()) throw new Error("Each color needs a name");
+        if (!isValidHexCode(c.hexCode)) {
+          throw new Error(`Enter a valid hex color for “${c.colorName.trim()}”`);
+        }
         if (!c.imageUrl.trim()) throw new Error(`Upload an image for “${c.colorName.trim() || "color"}”`);
       }
       const combinations = colors.flatMap((c) =>
         sizes.map((size) => {
           const k = `${c.clientKey}::${size}`;
           const cell = cells[k] ?? {
-            price: String(bp),
+            price: String(sp),
             stock: "0",
             isAvailable: true,
           };
@@ -189,14 +280,17 @@ export default function ProductNewPage() {
         name: name.trim(),
         description: description.trim(),
         fabric: fabric.trim(),
-        basePrice: bp,
+        mrp: mrpVal,
+        sellingPrice: sp,
         currency: currency.trim() || "NPR",
         allowedSizes: sizes,
+        freeDelivery,
+        deliveryCharge: freeDelivery ? 0 : deliveryAmount,
         active: true,
         colors: colors.map((c) => ({
           clientKey: c.clientKey,
           colorName: c.colorName.trim(),
-          colorNameEn: "",
+          hexCode: normalizeHexCode(c.hexCode),
           imageUrl: c.imageUrl.trim(),
           active: true,
         })),
@@ -230,7 +324,7 @@ export default function ProductNewPage() {
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-5xl">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <Button variant="ghost" size="sm" className="w-fit -ml-2 gap-1" asChild>
@@ -239,8 +333,7 @@ export default function ProductNewPage() {
               Products
             </Link>
           </Button>
-          <h1 className="text-2xl font-semibold tracking-tight">New product</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="font-body text-sm text-muted-foreground">
             Add sizes and colors, set prices per size for each color, upload one
             image per color (Cloudinary), then save once.
           </p>
@@ -304,16 +397,27 @@ export default function ProductNewPage() {
                 placeholder="Optional"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="pn-bp">Base price</Label>
+                <Label htmlFor="pn-mrp">MRP (रू)</Label>
                 <Input
-                  id="pn-bp"
+                  id="pn-mrp"
                   type="number"
                   min={0}
                   step="0.01"
-                  value={basePrice}
-                  onChange={(e) => setBasePrice(e.target.value)}
+                  value={mrp}
+                  onChange={(e) => setMrp(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pn-sp">Selling price (रू)</Label>
+                <Input
+                  id="pn-sp"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={sellingPrice}
+                  onChange={(e) => setSellingPrice(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -325,6 +429,41 @@ export default function ProductNewPage() {
                 />
               </div>
             </div>
+          </div>
+          <div className="space-y-3 rounded-lg border border-border px-4 py-3">
+            <Label>Delivery</Label>
+            <RadioGroup
+              value={freeDelivery ? "free" : "charge"}
+              onValueChange={(value) => setFreeDelivery(value === "free")}
+              className="gap-3"
+            >
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="free" id="pn-del-free" />
+                <Label htmlFor="pn-del-free" className="font-normal cursor-pointer">
+                  Free delivery
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="charge" id="pn-del-charge" />
+                <Label htmlFor="pn-del-charge" className="font-normal cursor-pointer">
+                  Delivery charge
+                </Label>
+              </div>
+            </RadioGroup>
+            {!freeDelivery && (
+              <div className="space-y-2 max-w-xs">
+                <Label htmlFor="pn-del-amt">Amount ({currency.trim() || "NPR"})</Label>
+                <Input
+                  id="pn-del-amt"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={deliveryCharge}
+                  onChange={(e) => setDeliveryCharge(e.target.value)}
+                  placeholder={String(DEFAULT_DELIVERY_CHARGE)}
+                />
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -356,7 +495,7 @@ export default function ProductNewPage() {
                 id="pn-csz"
                 value={customSize}
                 onChange={(e) => setCustomSize(e.target.value)}
-                placeholder="e.g. Free size"
+                placeholder="e.g. 3XL"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -389,44 +528,31 @@ export default function ProductNewPage() {
       </Card>
 
       <div className="space-y-4">
-        <h2 className="text-lg font-medium">Colors &amp; variants</h2>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-medium">Colors &amp; variants</h2>
+          <Button type="button" variant="secondary" className="gap-2" onClick={openAddVariantDialog}>
+            <Plus className="h-4 w-4" />
+            Add color variant
+          </Button>
+        </div>
 
       {colors.length === 0 ? (
         <p className="text-sm text-muted-foreground border border-dashed rounded-lg p-6 text-center">
-          No colors yet. Use the button below to add each shade and its photo.
+          No variants yet. Click &ldquo;Add color variant&rdquo; to pick a color, then upload a photo for each one.
         </p>
       ) : (
         <div className="space-y-6">
-          {colors.map((c, idx) => (
+          {colors.map((c) => (
             <Card key={c.clientKey} className="card-shadow border-border/60">
-              <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 pb-2">
-                <div className="space-y-2 flex-1 min-w-[200px]">
-                  <Label>Color name</Label>
-                  <Input
-                    value={c.colorName}
-                    onChange={(e) =>
-                      setColors((prev) =>
-                        prev.map((x) =>
-                          x.clientKey === c.clientKey
-                            ? { ...x, colorName: e.target.value }
-                            : x,
-                        ),
-                      )
-                    }
-                    placeholder={`Color ${idx + 1}`}
-                  />
-                </div>
+              <CardHeader className="flex flex-row items-start justify-between gap-3 pb-2">
+                <LockedColorDisplay colorName={c.colorName} hexCode={c.hexCode} />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="text-destructive shrink-0"
-                  onClick={() =>
-                    setColors((prev) =>
-                      prev.filter((x) => x.clientKey !== c.clientKey),
-                    )
-                  }
-                  aria-label="Remove color"
+                  onClick={() => removeColor(c.clientKey)}
+                  aria-label={`Remove ${c.colorName}`}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -482,7 +608,7 @@ export default function ProductNewPage() {
                       {sizes.map((size) => {
                         const k = `${c.clientKey}::${size}`;
                         const row = cells[k] ?? {
-                          price: basePrice,
+                          price: sellingPrice,
                           stock: "0",
                           isAvailable: true,
                         };
@@ -542,37 +668,67 @@ export default function ProductNewPage() {
           ))}
         </div>
       )}
-
-        <div
-          className={`flex justify-center pt-4 ${colors.length > 0 ? "border-t border-border/60" : ""}`}
-        >
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-1"
-            onClick={() => setColors((prev) => [...prev, newColor()])}
-          >
-            <Plus className="h-4 w-4" />
-            Add color
-          </Button>
-        </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 justify-end pt-2">
+      <div className="flex flex-col items-end gap-2 pt-2">
+        {colors.length === 0 && (
+          <p className="text-sm text-muted-foreground">{SAVE_REQUIRES_VARIANT_MSG}</p>
+        )}
+        <div className="flex flex-wrap gap-3 justify-end">
         <Button variant="outline" asChild>
           <Link to="/admin/products">Cancel</Link>
         </Button>
         <Button
-          onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending || categories.length === 0}
+          onClick={() => {
+            if (colors.length === 0) {
+              toast.error(SAVE_REQUIRES_VARIANT_MSG);
+              return;
+            }
+            saveMutation.mutate();
+          }}
+          disabled={
+            saveMutation.isPending || categories.length === 0 || colors.length === 0
+          }
         >
           {saveMutation.isPending && (
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
           )}
           Save product
         </Button>
+        </div>
       </div>
+
+      <Dialog open={variantDialogOpen} onOpenChange={setVariantDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add color variant</DialogTitle>
+          </DialogHeader>
+          <ColorVariantPicker
+            presets={colorPresets}
+            usedColorNames={colors.map((c) => c.colorName)}
+            colorName={variantColorName}
+            hexCode={variantHex}
+            presetActive={variantPresetActive}
+            onPresetSelect={selectVariantPreset}
+            onCustomColorNameChange={(value) => {
+              setVariantPresetActive(false);
+              setVariantColorName(value);
+            }}
+            onCustomHexChange={(value) => {
+              setVariantPresetActive(false);
+              setVariantHex(value);
+            }}
+            nameId="pn-variant-color-name"
+            hexId="pn-variant-color-hex"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVariantDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmAddVariant}>Add variant</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

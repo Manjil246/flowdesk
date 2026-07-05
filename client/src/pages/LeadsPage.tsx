@@ -129,7 +129,7 @@ export default function LeadsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `flowdesk-leads-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `stylesutra-leads-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Leads exported successfully");

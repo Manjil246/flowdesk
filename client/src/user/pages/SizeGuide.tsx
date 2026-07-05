@@ -12,18 +12,10 @@ const womenSizes = [
   { size: 'XXL', chest: '98–102', waist: '80–84', hip: '106–110', length: '106' },
 ];
 
-const menSizes = [
-  { size: 'S', chest: '92–96', waist: '76–80', hip: '92–96', length: '70' },
-  { size: 'M', chest: '96–100', waist: '80–84', hip: '96–100', length: '72' },
-  { size: 'L', chest: '100–104', waist: '84–88', hip: '100–104', length: '74' },
-  { size: 'XL', chest: '104–108', waist: '88–92', hip: '104–108', length: '76' },
-  { size: 'XXL', chest: '108–112', waist: '92–96', hip: '108–112', length: '78' },
-];
-
-function SizeTable({ title, data }: { title: string; data: typeof womenSizes }) {
+function SizeTable({ data }: { data: typeof womenSizes }) {
   return (
     <div className="mb-12">
-      <h2 className="font-display text-2xl text-foreground mb-6">{title}</h2>
+      <h2 className="font-display text-2xl text-foreground mb-6">Size Chart</h2>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
@@ -58,11 +50,12 @@ export default function SizeGuide() {
       <div className="container mx-auto px-4 py-20">
         <div className="text-center mb-12">
           <h1 className="font-display text-4xl lg:text-5xl text-foreground mb-4">Size Guide</h1>
-          <p className="font-body text-sm text-muted-foreground">Find your perfect fit</p>
+          <p className="font-body text-sm text-muted-foreground">
+            Women's ready-to-wear — all measurements in centimetres
+          </p>
         </div>
         <div className="max-w-3xl mx-auto">
-          <SizeTable title="Women's Sizes" data={womenSizes} />
-          <SizeTable title="Men's Sizes" data={menSizes} />
+          <SizeTable data={womenSizes} />
 
           <div className="bg-surface rounded-sm p-8 mb-8">
             <h3 className="font-display text-xl text-foreground mb-4">How to Measure</h3>

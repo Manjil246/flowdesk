@@ -6,18 +6,18 @@ export default function NewsletterSection() {
       <div className="container mx-auto flex flex-col lg:flex-row items-center justify-between gap-8">
         <div className="lg:w-1/2">
           <h2 className="font-display text-3xl lg:text-4xl italic font-light text-primary-foreground mb-3">
-            Crafted in Nepal, Styled for You
+            Ready-to-Wear from Chitwan
           </h2>
           <p className="font-body text-sm text-primary-foreground/60">
-            Discover timeless silhouettes, artisan textures, and everyday elegance.
+            Women's contemporary fashion — wear it today, love it tomorrow.
           </p>
         </div>
         <div className="lg:w-1/2 flex gap-3 w-full max-w-md">
           <Link
             to="/products"
-            className="flex-1 px-6 py-3 bg-accent text-accent-foreground font-body text-[11px] font-semibold uppercase tracking-[1.5px] rounded-sm hover:bg-accent-dark transition-colors text-center"
+            className="flex-1 px-6 py-3 bg-accent-dark text-primary-foreground font-body text-[11px] font-semibold uppercase tracking-[1.5px] rounded-sm hover:bg-accent-dark/90 transition-colors text-center"
           >
-            Explore Collection
+            Shop Now
           </Link>
           <Link
             to="/about"
@@ -28,10 +28,8 @@ export default function NewsletterSection() {
         </div>
       </div>
       <p className="container mx-auto mt-4 font-body text-[11px] text-primary-foreground/40 text-center lg:text-right">
-        Handpicked designs. Quality fabrics. Fair artisan craftsmanship.
+        StyleSutra · Women's ready-to-wear only · Established 2025
       </p>
     </section>
   );
 }
-
-

@@ -57,8 +57,8 @@ export const WABA_ID = process.env.WABA_ID || "";
 /** OpenAI API key for GPT bot replies. */
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
-/** Chat Completions model (default gpt-4o-mini; set gpt-5-* for GPT-5 family). */
-export const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+/** Chat Completions model (default gpt-5.5; set gpt-4o-mini for a cheaper/faster fallback). */
+export const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.5";
 
 /**
  * Sampling temperature for models that support it (e.g. gpt-4o-mini). Ignored for
@@ -97,3 +97,15 @@ export const BOT_REPLY_HISTORY_LIMIT = Math.min(
   40,
   Math.max(4, Number(process.env.BOT_REPLY_HISTORY_LIMIT) || 24),
 );
+
+/** Admin login — credentials live in env only (single admin). */
+export const ADMIN_EMAIL =
+  process.env.ADMIN_EMAIL?.trim().toLowerCase() || "";
+export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+
+/** JWT session for admin panel (httpOnly cookie). */
+export const JWT_SECRET = process.env.JWT_SECRET?.trim() || "";
+export const AUTH_COOKIE_NAME =
+  process.env.AUTH_COOKIE_NAME?.trim() || "auth_token";
+/** Default 7 days. */
+export const JWT_EXPIRES_SECONDS = 7 * 24 * 60 * 60;

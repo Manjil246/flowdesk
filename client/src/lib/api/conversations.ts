@@ -1,5 +1,7 @@
-const base = () =>
-  (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+import { adminFetch } from "@/lib/api/admin-fetch";
+import { apiBaseUrl } from "@/lib/api/base";
+
+const base = apiBaseUrl;
 
 export type ConversationDto = {
   id: string;
@@ -27,7 +29,7 @@ export type MessageDto = {
 
 export async function fetchConversations(): Promise<ConversationDto[]> {
   const url = `${base()}/api/v1/conversations`;
-  const res = await fetch(url);
+  const res = await adminFetch(url);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(
@@ -42,7 +44,7 @@ export async function fetchConversationMessages(
   conversationId: string,
 ): Promise<MessageDto[]> {
   const url = `${base()}/api/v1/conversations/${encodeURIComponent(conversationId)}/messages`;
-  const res = await fetch(url);
+  const res = await adminFetch(url);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(
@@ -63,7 +65,7 @@ export async function sendConversationText(
   body: { text: string; senderRole?: "admin" | "bot" },
 ): Promise<SendTextResponse> {
   const url = `${base()}/api/v1/conversations/${encodeURIComponent(conversationId)}/messages`;
-  const res = await fetch(url, {
+  const res = await adminFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -84,7 +86,7 @@ export async function markConversationAsRead(
   conversationId: string,
 ): Promise<void> {
   const url = `${base()}/api/v1/conversations/${encodeURIComponent(conversationId)}/read`;
-  const res = await fetch(url, { method: "PATCH" });
+  const res = await adminFetch(url, { method: "PATCH" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(

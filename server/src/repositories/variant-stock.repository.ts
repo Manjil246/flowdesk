@@ -36,6 +36,15 @@ export class VariantStockRepository {
     return docs as unknown as VariantStockLean[];
   }
 
+  async findByProductId(productId: string): Promise<VariantStockLean[]> {
+    const docs = await VariantStock.find({
+      productId: new mongoose.Types.ObjectId(productId),
+    })
+      .sort({ size: 1 })
+      .lean();
+    return docs as unknown as VariantStockLean[];
+  }
+
   async deleteManyByVariantId(variantId: string): Promise<void> {
     await VariantStock.deleteMany({
       variantId: new mongoose.Types.ObjectId(variantId),
@@ -77,5 +86,40 @@ export class VariantStockRepository {
       })),
     );
     return docs.map((d) => d.toObject() as VariantStockLean);
+  }
+
+  async decrementStock(
+    variantId: string,
+    size: string,
+    quantity: number,
+  ): Promise<VariantStockLean | null> {
+    const doc = await VariantStock.findOneAndUpdate(
+      {
+        variantId: new mongoose.Types.ObjectId(variantId),
+        size: size.trim(),
+        isAvailable: true,
+        active: true,
+        stock: { $gte: quantity },
+      },
+      { $inc: { stock: -quantity } },
+      { new: true },
+    ).lean();
+    return doc as VariantStockLean | null;
+  }
+
+  async incrementStock(
+    variantId: string,
+    size: string,
+    quantity: number,
+  ): Promise<VariantStockLean | null> {
+    const doc = await VariantStock.findOneAndUpdate(
+      {
+        variantId: new mongoose.Types.ObjectId(variantId),
+        size: size.trim(),
+      },
+      { $inc: { stock: quantity } },
+      { new: true },
+    ).lean();
+    return doc as VariantStockLean | null;
   }
 }

@@ -38,7 +38,7 @@ const AVATAR_COLORS = [
   "bg-red-500",
   "bg-indigo-500",
   "bg-yellow-600",
-  "bg-emerald-600",
+  "bg-accent-dark",
   "bg-cyan-600",
 ];
 

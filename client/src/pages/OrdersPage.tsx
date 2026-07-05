@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { Loader2, Package } from "lucide-react";
+import { Loader2, Package, Plus } from "lucide-react";
 import { fetchOrders, type OrderStatus } from "@/lib/api/orders";
 import { ORDER_STATUS_VALUES, orderStatusLabel } from "@/lib/order-status-workflow";
 import { Button } from "@/components/ui/button";
@@ -39,15 +39,20 @@ export default function OrdersPage() {
   const orders = data?.orders ?? [];
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Orders</h1>
-          <p className="text-sm text-muted-foreground">
-            WhatsApp shop orders — open an order for full details and status updates.
+          <p className="font-body text-sm text-muted-foreground">
+            Website, WhatsApp, and manually entered orders — open one for details and status updates.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild>
+            <Link to="/admin/orders/new">
+              <Plus className="h-4 w-4 mr-1" />
+              Create order
+            </Link>
+          </Button>
           <span className="text-sm text-muted-foreground">Status</span>
           <Select
             value={statusFilter}
@@ -123,14 +128,18 @@ export default function OrdersPage() {
                       </TableCell>
                       <TableCell className="text-sm">
                         <div>{row.customerOrderPhone}</div>
-                        <div className="text-muted-foreground text-xs">WA {row.customerWaPhone}</div>
+                        {row.customerEmail ? (
+                          <div className="text-muted-foreground text-xs">{row.customerEmail}</div>
+                        ) : row.customerWaPhone ? (
+                          <div className="text-muted-foreground text-xs">WA {row.customerWaPhone}</div>
+                        ) : null}
                       </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">
                         {row.currency} {row.grandTotal.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" asChild>
-                          <Link to={`/orders/${row._id}`}>View details</Link>
+                          <Link to={`/admin/orders/${row._id}`}>View details</Link>
                         </Button>
                       </TableCell>
                     </TableRow>

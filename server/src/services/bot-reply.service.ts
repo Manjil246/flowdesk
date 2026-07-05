@@ -67,7 +67,7 @@ function buildSessionStateBlock(session: BotSessionLean): string {
 
   if (session.products?.length) {
     lines.push(
-      `PRODUCTS_SHOWN: ${session.products.map((p) => `${p.n}=${p.name} (NPR ${p.basePrice})`).join(", ")}`,
+      `PRODUCTS_SHOWN: ${session.products.map((p) => `${p.n}=${p.name} (NPR ${p.sellingPrice})`).join(", ")}`,
     );
   }
 
@@ -164,7 +164,7 @@ export class BotReplyService implements IBotReplyService {
       const numberedColors = detail.colors.filter((c) => c.active).map((c, i) => ({
         n: i + 1,
         id: c.id,
-        name: c.colorName || c.colorNameEn || `Color ${i + 1}`,
+        name: c.colorName || `Color ${i + 1}`,
         imageUrl: c.imageUrl,
       }));
       const snapshot = {
@@ -173,7 +173,7 @@ export class BotReplyService implements IBotReplyService {
         description: detail.product.description,
         fabric: detail.product.fabric,
         occasions: detail.product.occasions,
-        basePrice: detail.product.basePrice,
+        sellingPrice: detail.product.sellingPrice,
         currency: detail.product.currency,
         sizes: detail.product.allowedSizes,
         colors: numberedColors,
@@ -205,7 +205,8 @@ export class BotReplyService implements IBotReplyService {
         description: detail.product.description,
         fabric: detail.product.fabric,
         occasions: detail.product.occasions,
-        basePrice: detail.product.basePrice,
+        sellingPrice: detail.product.sellingPrice,
+        mrp: detail.product.mrp,
         currency: detail.product.currency,
         sizes: detail.product.allowedSizes,
         colors: colorsForLLM,
@@ -727,7 +728,7 @@ export class BotReplyService implements IBotReplyService {
                 n: i + 1,
                 id: p.id,
                 name: p.name,
-                basePrice: p.basePrice,
+                sellingPrice: p.sellingPrice,
               }));
               await this.botSessionRepo.setProductsMenu(
                 conversationId,

@@ -10,9 +10,12 @@ export type ProductLean = Pick<
   | "description"
   | "occasions"
   | "fabric"
-  | "basePrice"
+  | "mrp"
+  | "sellingPrice"
   | "currency"
   | "allowedSizes"
+  | "freeDelivery"
+  | "deliveryCharge"
   | "active"
   | "sortOrder"
 > & { createdAt?: Date; updatedAt?: Date };
@@ -72,9 +75,12 @@ export class ProductRepository {
     description: string;
     occasions: string[];
     fabric: string;
-    basePrice: number;
+    mrp: number;
+    sellingPrice: number;
     currency: string;
     allowedSizes: string[];
+    freeDelivery: boolean;
+    deliveryCharge: number;
     active: boolean;
     sortOrder: number;
   }): Promise<ProductLean> {
@@ -90,9 +96,12 @@ export class ProductRepository {
       description: string;
       occasions: string[];
       fabric: string;
-      basePrice: number;
+      mrp: number;
+      sellingPrice: number;
       currency: string;
       allowedSizes: string[];
+      freeDelivery: boolean;
+      deliveryCharge: number;
       active: boolean;
       sortOrder: number;
     }>,
