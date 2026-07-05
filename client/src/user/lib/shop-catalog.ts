@@ -1,7 +1,5 @@
 import {
-  fetchCategories,
   fetchProductDetail,
-  type CategoryDto,
   type ProductDetailDto,
 } from '@/lib/api/catalog';
 import { fetchProductPickerOptions } from '@/lib/catalog-picker';
@@ -43,19 +41,10 @@ export type ShopProductDetail = {
   currency: string;
   freeDelivery: boolean;
   deliveryCharge: number;
-  categoryId: string;
-  categoryName: string;
   colors: ShopColorOption[];
 };
 
-function categoryNameMap(categories: CategoryDto[]): Map<string, string> {
-  return new Map(categories.map((c) => [c.id, c.name]));
-}
-
-function mapDetailToShopProduct(
-  detail: ProductDetailDto,
-  categoryNames: Map<string, string>,
-): ShopProductDetail {
+function mapDetailToShopProduct(detail: ProductDetailDto): ShopProductDetail {
   const { product } = detail;
   const colors: ShopColorOption[] = detail.colors
     .filter((c) => c.active)
@@ -90,8 +79,6 @@ function mapDetailToShopProduct(
     currency: product.currency,
     freeDelivery: hasFreeDelivery,
     deliveryCharge: hasFreeDelivery ? 0 : product.deliveryCharge,
-    categoryId: product.categoryId,
-    categoryName: categoryNames.get(product.categoryId) ?? 'Ready-to-Wear',
     colors,
   };
 }
@@ -115,12 +102,9 @@ export async function fetchShopProductList(): Promise<ShopProductListItem[]> {
 export async function fetchShopProduct(
   productId: string,
 ): Promise<ShopProductDetail | null> {
-  const [categories, detail] = await Promise.all([
-    fetchCategories({ active: 'all' }),
-    fetchProductDetail(productId).catch(() => null),
-  ]);
+  const detail = await fetchProductDetail(productId).catch(() => null);
   if (!detail || !detail.product.active) return null;
-  const mapped = mapDetailToShopProduct(detail, categoryNameMap(categories));
+  const mapped = mapDetailToShopProduct(detail);
   if (mapped.colors.length === 0) return null;
   return mapped;
 }

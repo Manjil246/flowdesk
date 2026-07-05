@@ -104,10 +104,12 @@ export default function ProductEditPage() {
   const { productId } = useParams<{ productId: string }>();
   const qc = useQueryClient();
 
-  const { data: categories = [] } = useQuery({
+  const { data: categories, isLoading: categoriesLoading } = useQuery({
     queryKey: ["categories"],
     queryFn: () => fetchCategories({ active: "all" }),
   });
+
+  const categoryList = categories ?? [];
 
   const { data: colorPresets = [] } = useQuery({
     queryKey: ["colorPresets"],
@@ -515,7 +517,7 @@ export default function ProductEditPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((c) => (
+                      {categoryList.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.name}
                         </SelectItem>

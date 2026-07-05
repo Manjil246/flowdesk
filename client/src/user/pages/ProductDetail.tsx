@@ -162,9 +162,6 @@ export default function ProductDetail() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.1 }}
             >
-              <p className="font-body text-[10px] uppercase tracking-[2px] text-accent-foreground font-medium mb-2">
-                {product.categoryName}
-              </p>
               <h1 className="font-display text-3xl lg:text-4xl font-normal text-foreground leading-[1.2] mb-3">
                 {product.name}
               </h1>

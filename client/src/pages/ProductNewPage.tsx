@@ -79,10 +79,18 @@ export default function ProductNewPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const { data: categories = [] } = useQuery({
+  const {
+    data: categories,
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+  } = useQuery({
     queryKey: ["categories"],
     queryFn: () => fetchCategories({ active: "all" }),
   });
+
+  const categoryList = categories ?? [];
+  const noCategoriesYet =
+    !categoriesLoading && !categoriesError && categoryList.length === 0;
 
   const { data: colorPresets = [] } = useQuery({
     queryKey: ["colorPresets"],
@@ -111,10 +119,10 @@ export default function ProductNewPage() {
   const [variantPresetActive, setVariantPresetActive] = useState(false);
 
   useEffect(() => {
-    if (!categoryId && categories[0]?.id) {
-      setCategoryId(categories[0].id);
+    if (!categoryId && categoryList[0]?.id) {
+      setCategoryId(categoryList[0].id);
     }
-  }, [categories, categoryId]);
+  }, [categoryList, categoryId]);
 
   useEffect(() => {
     setCells((prev) => {
@@ -340,7 +348,20 @@ export default function ProductNewPage() {
         </div>
       </div>
 
-      {categories.length === 0 && (
+      {categoriesLoading && (
+        <p className="text-sm text-muted-foreground flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading categories…
+        </p>
+      )}
+
+      {categoriesError && (
+        <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+          Could not load categories. Refresh the page or check the API connection.
+        </p>
+      )}
+
+      {noCategoriesYet && (
         <p className="text-sm text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
           Create a category first, then return here.
         </p>
@@ -359,7 +380,7 @@ export default function ProductNewPage() {
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((c) => (
+                  {categoryList.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
                     </SelectItem>
@@ -687,7 +708,10 @@ export default function ProductNewPage() {
             saveMutation.mutate();
           }}
           disabled={
-            saveMutation.isPending || categories.length === 0 || colors.length === 0
+            saveMutation.isPending ||
+            categoriesLoading ||
+            noCategoriesYet ||
+            colors.length === 0
           }
         >
           {saveMutation.isPending && (

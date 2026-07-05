@@ -49,10 +49,18 @@ export default function ProductsPage() {
   );
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const { data: categories = [] } = useQuery({
+  const {
+    data: categories,
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+  } = useQuery({
     queryKey: ["categories"],
     queryFn: () => fetchCategories({ active: "all" }),
   });
+
+  const categoryList = categories ?? [];
+  const noCategoriesYet =
+    !categoriesLoading && !categoriesError && categoryList.length === 0;
 
   const {
     data: products = [],
@@ -88,7 +96,7 @@ export default function ProductsPage() {
         </div>
         <Button
           className="gap-2 shrink-0"
-          disabled={categories.length === 0}
+          disabled={noCategoriesYet}
           asChild
         >
           <Link to="/admin/products/new">
@@ -98,7 +106,20 @@ export default function ProductsPage() {
         </Button>
       </div>
 
-      {categories.length === 0 && (
+      {categoriesLoading && (
+        <p className="text-sm text-muted-foreground flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading categories…
+        </p>
+      )}
+
+      {categoriesError && (
+        <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+          Could not load categories. Refresh the page or check the API connection.
+        </p>
+      )}
+
+      {noCategoriesYet && (
         <p className="text-sm text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
           Create at least one category before adding products.
         </p>
@@ -120,7 +141,7 @@ export default function ProductsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All categories</SelectItem>
-                {categories.map((c) => (
+                {categoryList.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.name}
                   </SelectItem>
@@ -194,7 +215,7 @@ export default function ProductsPage() {
                           </Link>
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
-                          {categoryName(categories, p.categoryId)}
+                          {categoryName(categoryList, p.categoryId)}
                         </TableCell>
                         <TableCell>
                           {p.active ? (
